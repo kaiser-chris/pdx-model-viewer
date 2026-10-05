@@ -1,0 +1,121 @@
+# PDX Model Viewer
+
+A small viewer for the 3D models of Victoria 3, Europa Universalis 5 and
+Crusader Kings 3. Open an `.asset` file and it shows the entities the file
+defines, drawn with their meshes and textures.
+
+It runs on Windows and Linux.
+
+## Usage
+
+### Opening a file
+
+The viewer is not set up with a game folder. It is meant to be what `.asset`
+files open with: associate the extension with `pdx-model-viewer` (on Windows,
+**Open with → Choose another app → Always**) and double-click a file. It
+opens with **File → Open...** (`Ctrl+O`) as well, and a file dropped onto the
+window.
+
+The meshes and textures of the file are looked for where the game looks for
+them, from the game the file belongs to, which the viewer works out from
+where the file is:
+
+- the folder above the `gfx` folder the file is in is the root of the game or
+  mod, so `Victoria 3/game/gfx/models/.../x.asset` belongs to `Victoria 3/game`;
+- a layer, such as Europa Universalis 5's `in_game`, belongs to the folder
+  above it;
+- a DLC, below the game's `dlc` folder, belongs to the game, so that what it
+  uses from the game is found as well.
+
+A file has to be inside the `gfx` folder of a game or mod. A mod that draws
+meshes or textures of the game it changes is not supported yet: it is read on
+its own.
+
+The game's asset definitions are read once, which takes under a second, and
+kept while the viewer runs, so the next file of the same game opens at once.
+**File → Reload** (`F5`) reads them again, for files that changed since.
+
+### Viewing
+
+A file with one entity shows it at once; a file with several lists them on the
+left, to pick one from. The arrow keys step through the list, and the search
+box narrows it down.
+
+| In the viewport                | Effect                          |
+|--------------------------------|---------------------------------|
+| Drag                           | Turn the camera around the model |
+| Drag with the right or middle button | Move the view along      |
+| Scroll                         | Move closer or further          |
+| Double-click, or `Home`        | Back to the front view, on the middle of the model |
+| `T`                            | Turn the model by itself        |
+
+**Details** shows how the entity is put together: where it is defined, the
+entities it clones, its mesh, and each shape of the mesh with its shader,
+triangles and which textures were found (**D**iffuse, **N**ormal,
+**P**roperties). Shapes the game does not draw, such as collision shapes, are
+listed as such and left out. **Problems** lists what could not be read, such as
+a texture that was not found, which is drawn with a neutral stand in.
+
+The palette colour is what the games blend in where a diffuse map's alpha says,
+such as a skin tone. The viewer picks a skin tone for a portrait's skin and no
+tint for anything else, until you pick one yourself.
+
+The layout of the panels is kept in `%AppData%\pdx-model-viewer` on Windows and
+in `~/.config/pdx-model-viewer` on Linux. **View → Reset Layout** puts them
+back.
+
+### Not supported yet
+
+What pdx-asset-go does not draw yet, the viewer does not show either:
+
+- skinning and animation: models are drawn in the pose their mesh files store;
+- transparency and decals, which are drawn opaque;
+- the files of `pdxmesh` definitions that no entity of the file draws.
+
+## Building
+
+The viewer is written in Go and draws with [raylib](https://www.raylib.com/)
+and [Dear ImGui](https://github.com/ocornut/imgui), which are compiled along
+with it, so a C and C++ compiler is needed as well as Go. The files of the
+games are read and drawn by
+[pdx-asset-go](https://github.com/kaiser-chris/pdx-asset-go) and
+[pdx-parser-go](https://github.com/kaiser-chris/pdx-parser-go).
+
+Until pdx-asset-go is released, it is built from a checkout next to this one,
+through a Go workspace:
+
+```
+go work init . ../pdx-asset-go
+```
+
+### Windows
+
+1. Install [Go](https://go.dev/dl/), in the version `go.mod` asks for or newer.
+2. Install a MinGW-w64 toolchain, for example
+   [w64devkit](https://github.com/skeeto/w64devkit) or the one that comes with
+   [MSYS2](https://www.msys2.org/), and put its `bin` folder on `PATH`.
+3. Run `build.bat`. The executable lands in `bin\windows`.
+
+### Linux
+
+1. Install [Go](https://go.dev/dl/), in the version `go.mod` asks for or newer.
+2. Install a compiler and the OpenGL, X11 and Wayland development files. On
+   Debian and Ubuntu:
+
+   ```bash
+   sudo apt-get install build-essential libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+   ```
+
+3. Run `./build.sh`. The executable lands in `bin/linux`.
+
+### Tests
+
+| Command          | Effect |
+|------------------|--------|
+| `make test`      | The tests that need neither a GPU nor a game |
+| `make uitest`    | Also drives the real application in a hidden window, clicking and typing through Dear ImGui; needs a display but shows nothing on it |
+| `make gametest PDX_GAME_DIR=...` | Also reads every asset file of real installations and views a sample of their entities |
+
+`PDX_GAME_DIR` takes several game folders, separated the way `PATH` is. With
+`PDX_DUMP_DIR` set as well, the viewport of every entity viewed is written out
+as a PNG file, which is how to see that the models look right without a window.
