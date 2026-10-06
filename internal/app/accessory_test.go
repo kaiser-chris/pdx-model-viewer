@@ -20,7 +20,7 @@ func TestShowsTheAccessoriesOfAModel(t *testing.T) {
 	openFile(t, application, driver, fixtureFile(t, "belt.asset"))
 	waitForEntity(application, driver, "belt_entity")
 
-	for _, shown := range []string{labelPatterns, "fixture_belt"} {
+	for _, shown := range []string{labelVariation, "fixture_belt", labelPatterns, labelPalettes} {
 		if !driver.Exists(panelDetails, shown) {
 			t.Errorf("the details do not show %q", shown)
 		}
@@ -105,7 +105,7 @@ func TestAnAccessoryOfAnEffectWithoutAPattern(t *testing.T) {
 	openFile(t, application, driver, fixtureFile(t, "plain_belt.asset"))
 	waitForEntity(application, driver, "plain_belt_entity")
 
-	if !driver.Exists(panelDetails, labelPatterns) {
+	if !driver.Exists(panelDetails, labelVariation) {
 		t.Error("the accessory of an effect without a pattern is not listed")
 	}
 

@@ -449,8 +449,8 @@ func (a *App) detailsBody() {
 	// What colours the parts, where the entities of the model are portrait
 	// accessories of Victoria 3 or Crusader Kings 3.
 	if choices := a.shown.model.Accessories(); len(choices) > 0 {
-		imgui.SeparatorText(labelPatterns)
-		gui.Record(labelPatterns)
+		imgui.SeparatorText(labelVariation)
+		gui.Record(labelVariation)
 		a.accessoriesBody(details, choices)
 	}
 
@@ -514,9 +514,23 @@ const (
 // says, since the game would not colour that part either.
 const textAccessoryNotDrawn = "The effect of this part lays no pattern, so the game does not draw the accessory either."
 
-// labelPatterns heads what colours the model, which is the patterns a portrait
-// accessory is drawn with and the palette they are coloured by.
-const labelPatterns = "Patterns"
+// labelVariation heads what colours the model, which is the variation a
+// portrait accessory is drawn with and what it offers to draw it with, and
+// labelEntity names the entity that carries one that is not the model's own.
+const (
+	labelVariation = "Variation"
+	labelEntity    = "Entity"
+)
+
+// What a variation offers to draw an accessory with, which is named above the
+// list of it, and in the singular where there is only one to name.
+const (
+	labelPatterns = "Patterns"
+	labelPalettes = "Palettes"
+
+	labelOnePattern = "Pattern"
+	labelOnePalette = "Palette"
+)
 
 // accessoriesBody lists what colours the parts of the model: every entity
 // that carries a portrait accessory, the variation it names, and the patterns
@@ -524,8 +538,8 @@ const labelPatterns = "Patterns"
 //
 // The games pick one pattern and one palette of a variation at random for
 // every portrait they draw, so where a variation offers more than one of
-// either, which is drawn is the user's to pick, from a list of the
-// alternatives the way a file's entities are listed. A variation that offers
+// either, which is drawn is the user's to pick from a list of the
+// alternatives, the way a file's entities are listed. A variation that offers
 // one of either has nothing to choose, and is only named.
 func (a *App) accessoriesBody(details workspace.Details, choices []render.AccessoryChoice) {
 	for index, choice := range choices {
@@ -533,63 +547,64 @@ func (a *App) accessoriesBody(details workspace.Details, choices []render.Access
 			imgui.Spacing()
 		}
 
+		a.accessoryVariation(details, index, choice)
+
 		if !choice.Drawn {
 			gui.DimmedText(textAccessoryNotDrawn)
 		}
 
-		if !beginPropertyTable(fmt.Sprintf("##accessory%d", index)) {
-			continue
-		}
-
-		propertyRow("Variation", choice.Variation)
-
-		if choice.Attachment > 0 {
-			propertyRow("Entity", attachmentLabel(details, choice.Attachment))
-		}
-
-		// The patterns need no label of their own: the heading of the section
-		// is what they are.
-		a.accessoryAlternatives(index, "pattern", "", "Pattern", choice.PatternNames, choice.Pattern, func(at int) {
+		a.accessoryAlternatives(index, "pattern", labelPatterns, labelOnePattern, choice.PatternNames, choice.Pattern, func(at int) {
 			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, at, choice.Palette)
 		})
 
-		a.accessoryAlternatives(index, "palette", "Palettes", "Palette", choice.PaletteNames, choice.Palette, func(at int) {
+		a.accessoryAlternatives(index, "palette", labelPalettes, labelOnePalette, choice.PaletteNames, choice.Palette, func(at int) {
 			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, choice.Pattern, at)
 		})
-
-		imgui.EndTable()
 	}
 }
 
-// accessoryAlternatives writes a row of an accessory: what it is drawn with,
-// listed the way a file's entities are where there is more than one to choose
-// between, and named where there is only one.
+// accessoryVariation names the variation that colours an accessory, beside the
+// label of it as the rows of the entity above are named, and says which entity
+// carries the accessory where that is not the entity on view.
+func (a *App) accessoryVariation(details workspace.Details, index int, choice render.AccessoryChoice) {
+	if !beginPropertyTable(fmt.Sprintf("##variation%d", index)) {
+		return
+	}
+
+	propertyRow(labelVariation, choice.Variation)
+
+	if choice.Attachment > 0 {
+		propertyRow(labelEntity, attachmentLabel(details, choice.Attachment))
+	}
+
+	imgui.EndTable()
+}
+
+// accessoryAlternatives names what a variation offers to draw an accessory
+// with, its patterns or its palettes, and lists it: one row per alternative,
+// picked by clicking, as wide as the panel. Where there is only one there is
+// nothing to pick from, and it is named instead.
 //
-// many is the label the list goes under, and empty where the heading of the
-// section already says it. Each row is named with the accessory it belongs to
-// and its place in the list, since two accessories can offer alternatives of
-// the same name.
+// The list is ended whether or not it opened: a list that is not ended leaves
+// its window open for the next widget to land in. A row is named with the
+// accessory it belongs to and its place in the list, since two accessories can
+// offer alternatives of the same name.
 func (a *App) accessoryAlternatives(index int, kind, many, one string, alternatives []string, chosen int, pick func(at int)) {
 	switch len(alternatives) {
 	case 0:
 		return
 	case 1:
-		propertyRow(one, alternatives[0])
+		imgui.Spacing()
+		gui.DimmedText(one)
+		gui.TextWrapped(alternatives[0])
+		gui.Record(alternatives[0])
 
 		return
 	}
 
-	imgui.TableNextRow()
-	imgui.TableNextColumn()
+	imgui.Spacing()
+	gui.DimmedText(many)
 
-	if many != "" {
-		gui.DimmedText(many)
-	}
-
-	imgui.TableNextColumn()
-
-	// The list is ended whether or not it opened: a list that is not ended
-	// leaves its window open for the next widget to land in.
 	if open := gui.BeginListRows(fmt.Sprintf("##%s%d", kind, index), len(alternatives)); open {
 		for at, alternative := range alternatives {
 			selected := at == chosen

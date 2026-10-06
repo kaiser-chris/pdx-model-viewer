@@ -135,15 +135,16 @@ A part whose entity's game data names a portrait accessory — a belt, a coat, a
 sash of Victoria 3 or Crusader Kings 3 — is drawn with the pattern and the
 colours of that accessory's variation: the mask the entity names says which
 pattern goes where, and the palette the variation names holds the colour of
-each of the mask's four channels. **Details** ends with a **Patterns** section:
-each entity that carries an accessory, with the variation it names beside the
-label, and under it the patterns and the colour palettes that variation offers,
-listed the way a file's entities are. Where it offers more than one of either,
-picking one draws the model with it without opening the entity again, and a
-name too long for its row is cut short with three dots. An accessory whose
-effect lays no pattern is listed too, and said to be drawn by nothing, which
-is what the game does with it. Where the shaders that lay a pattern are not
-the games' own, what the viewer draws is an approximation of them.
+each of the mask's four channels. **Details** ends with a **Variation** section:
+each entity that carries an accessory, named by the variation it is drawn with,
+and under that the patterns and the colour palettes the variation offers, each
+listed the way a file's entities are, across the whole width of the panel.
+Where it offers more than one of either, picking one draws the model with it
+without opening the entity again, and a name too long for its row is cut short
+with three dots. An accessory whose effect lays no pattern is listed too, and
+said to be drawn by nothing, which is what the game does with it. Where the
+shaders that lay a pattern are not the games' own, what the viewer draws is an
+approximation of them.
 
 The palette colour is what the games blend in where a diffuse map's alpha says,
 such as a skin tone. It only shows on parts drawn as skin, so **Details**
