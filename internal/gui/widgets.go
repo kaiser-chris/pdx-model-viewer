@@ -120,20 +120,6 @@ func BeginMenu(label string) bool {
 	return open
 }
 
-// BeginCombo is imgui.BeginCombo. The recorded item is the combo box, which
-// is what opens it.
-func BeginCombo(label, preview string) bool {
-	var where place
-	if recorder != nil {
-		where = currentPlace()
-	}
-
-	open := imgui.BeginCombo(label, preview)
-	recordIn(where, label, false)
-
-	return open
-}
-
 // place is where a widget is being laid out: the window and the part of it
 // that is visible.
 type place struct {

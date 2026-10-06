@@ -38,10 +38,7 @@ with its meshes and textures, is drawn as well as it can be, on its own:
   game with the files it uses works;
 - a texture of colour that is not there shows as a magenta and black
   checkerboard, a missing normal or properties map is left out, and a missing
-  mesh, or one defined in another asset file, shows as nothing;
-- without the game's shaders, the parts are drawn with the viewer's own, which
-  tells from the name of each part's shader whether it is skin, a decal laid
-  over the rest, or leaves and hair cut out by their alpha.
+  mesh, or one defined in another asset file, shows as nothing.
 
 The game's asset definitions are read once, which takes under a second, and
 kept while the viewer runs, so the next file of the same game opens at once.
@@ -68,6 +65,11 @@ triangles and which textures were found (**D**iffuse, **N**ormal,
 listed as such and left out. **Problems** lists what could not be read, such as
 a texture that was not found, which is drawn with a neutral stand in.
 
+The models are drawn with a shader of the viewer's own, an approximation of
+the games' look rather than their own shaders and lighting. It tells from the
+name of each part's shader how to draw it: skin with the palette colour,
+decals laid over the rest, leaves and hair cut out by their alpha.
+
 The palette colour is what the games blend in where a diffuse map's alpha says,
 such as a skin tone. The viewer picks a skin tone for a portrait's skin and no
 tint for anything else, until you pick one yourself.
@@ -81,7 +83,8 @@ back.
 What pdx-asset-go does not draw yet, the viewer does not show either:
 
 - skinning and animation: models are drawn in the pose their mesh files store;
-- transparency and decals, which are drawn opaque;
+- the games' own shaders and the lighting of their environments: the look is
+  an approximation;
 - the files of `pdxmesh` definitions that no entity of the file draws.
 
 ## Building

@@ -3,7 +3,6 @@ package workspace
 import (
 	"cmp"
 	"fmt"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,9 +15,7 @@ import (
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
 	"github.com/kaiser-chris/pdx-asset-go/entity"
-	"github.com/kaiser-chris/pdx-asset-go/environment"
 	"github.com/kaiser-chris/pdx-asset-go/model"
-	"github.com/kaiser-chris/pdx-asset-go/shader"
 	"github.com/kaiser-chris/pdx-asset-go/texture"
 )
 
@@ -104,7 +101,7 @@ type Game struct {
 //
 // The folders of the game's engine, clausewitz and jomini next to the game
 // folder of an installation, are read before the root, the way the engine
-// mounts them: most of the shader files are theirs.
+// mounts them: some of the textures are theirs.
 func OpenGame(root string) (*Game, error) {
 	start := time.Now()
 	name := SourceName(root)
@@ -114,7 +111,7 @@ func OpenGame(root string) (*Game, error) {
 		return nil, fmt.Errorf("%s holds no game or mod files", root)
 	}
 
-	set := folders.Open(append(shader.Engine(root), folders.Source{Name: name, Path: root}))
+	set := folders.Open(append(entity.EngineFolders(root), folders.Source{Name: name, Path: root}))
 
 	assets := asset.Load(set)
 
@@ -136,8 +133,7 @@ func OpenGame(root string) (*Game, error) {
 // entities it defines are drawn with what is around it. The files they name
 // are looked for where the file says, and by their names next to it; a
 // texture of colour that is not there anyway shows as a checkerboard, a mesh
-// that is not there as nothing. Without the games' shaders, the parts are
-// drawn with the viewer's own.
+// that is not there as nothing.
 func OpenLoose(location Location) (*Game, error) {
 	start := time.Now()
 	name := SourceName(location.Root)
@@ -170,121 +166,6 @@ func OpenLoose(location Location) (*Game, error) {
 // Loose reports whether the game is a loose file's, of no game.
 func (g *Game) Loose() bool {
 	return g.set == nil
-}
-
-// ShaderSource reads the shader files the entities of an asset file are drawn
-// with: those of the layer the file is in, in a game split into layers. A
-// loose file has none, and is drawn with the viewer's own shader.
-func (g *Game) ShaderSource(location Location) shader.Source {
-	if g.set == nil {
-		return nil
-	}
-
-	layer, _, found := strings.Cut(location.Relative, "/")
-	if !found || !slices.Contains(g.set.Layers(), layer) {
-		layer = ""
-	}
-
-	return shader.Folders{Set: g.set, Layer: layer}
-}
-
-// Lighting is the environment the game lights its world with, and its
-// environment map, decoded.
-type Lighting struct {
-	Environment *environment.Environment
-	Map         *texture.Cube
-}
-
-// BuiltIn names the library's own environment, which lights the entities
-// of a game that has no environment files.
-const BuiltIn = ""
-
-// Environments are the environment files the entities of an asset file can
-// be lit with, as the game's model editor offers them: those of the folder
-// the game's own environment file is in, that game's own first. A game with
-// none has none; its entities are lit by the built in environment.
-func (g *Game) Environments(location Location) []string {
-	if g.set == nil {
-		return nil
-	}
-
-	source := g.ShaderSource(location)
-	configured := environment.ConfiguredPath(source)
-
-	files, _ := g.set.Files(folders.Folder{Path: path.Dir(configured)})
-
-	var found []string
-
-	for _, file := range files {
-		relative := file.Relative
-		if file.Layer != "" {
-			relative = strings.TrimPrefix(relative, file.Layer+"/")
-		}
-
-		if slices.Contains(found, relative) {
-			continue
-		}
-
-		data, err := source.ReadFile(relative)
-		if err != nil || !environment.IsEnvironment(string(data)) {
-			continue
-		}
-
-		found = append(found, relative)
-	}
-
-	slices.SortStableFunc(found, func(a, b string) int {
-		switch {
-		case a == configured:
-			return -1
-		case b == configured:
-			return 1
-		}
-
-		return strings.Compare(a, b)
-	})
-
-	return found
-}
-
-// Lighting reads an environment the entities of an asset file are lit with,
-// and the environment map it names: one of Environments, or for BuiltIn the
-// library's own. Without the file it is the library's defaults, and when its
-// map cannot be read the library's, and the error says why.
-func (g *Game) Lighting(location Location, file string) (*Lighting, error) {
-	if file == BuiltIn || g.set == nil {
-		return &Lighting{Environment: environment.Default(), Map: environment.DefaultCube()}, nil
-	}
-
-	source := g.ShaderSource(location)
-
-	read, err := environment.LoadFile(source, file)
-	if err != nil {
-		return &Lighting{Environment: read, Map: environment.DefaultCube()}, err
-	}
-
-	// An environment that names no map gives no light from around, as the
-	// game draws Victoria 3's environment_greyscale.txt; one whose map cannot
-	// be read has the library's.
-	if read.Cubemap == "" {
-		return &Lighting{Environment: read}, nil
-	}
-
-	lighting := &Lighting{Environment: read, Map: environment.DefaultCube()}
-
-	data, err := source.ReadFile(read.Cubemap)
-	if err != nil {
-		return lighting, fmt.Errorf("the environment map %s: %w", read.Cubemap, err)
-	}
-
-	cube, err := texture.DecodeCube(data)
-	if err != nil {
-		return lighting, fmt.Errorf("the environment map %s: %w", read.Cubemap, err)
-	}
-
-	lighting.Map = cube
-
-	return lighting, nil
 }
 
 // Entities is how many entities the game defines.
