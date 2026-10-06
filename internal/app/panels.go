@@ -11,6 +11,8 @@ import (
 
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
+	"github.com/kaiser-chris/pdx-asset-go/render"
+
 	"github.com/kaiser-chris/pdx-model-viewer/internal/gui"
 	"github.com/kaiser-chris/pdx-model-viewer/internal/workspace"
 )
@@ -444,6 +446,15 @@ func (a *App) detailsBody() {
 		attachedTree(details, 0)
 	}
 
+	// What colours the parts, where the entities of the model are portrait
+	// accessories of Victoria 3 or Crusader Kings 3.
+	if choices := a.shown.model.Accessories(); len(choices) > 0 {
+		heading := fmt.Sprintf("Accessories (%d)", len(choices))
+		imgui.SeparatorText(heading)
+		gui.Record(heading)
+		a.accessoriesBody(details, choices)
+	}
+
 	// What the files did not have.
 	if count := len(loaded.Diagnostics); count > 0 {
 		imgui.SeparatorText(fmt.Sprintf("Problems (%d)", count))
@@ -499,6 +510,86 @@ const (
 	textOnlyAttached = "The entity draws no mesh of its own, only what it attaches."
 	textNoMesh       = "The entity draws no mesh."
 )
+
+// textAccessoryNotDrawn is what an accessory whose effect lays no pattern
+// says, since the game would not colour that part either.
+const textAccessoryNotDrawn = "The effect of this part lays no pattern, so the game does not draw the accessory either."
+
+// accessoriesBody lists the portrait accessories the model is coloured with:
+// each entity that carries one, with the variation it names and the pattern
+// and the colour palette it is drawn with.
+//
+// The games pick one pattern and one palette of a variation at random for
+// every portrait they draw, so where a variation offers more than one of
+// either, which is drawn is the user's to pick. An accessory of one pattern
+// and one palette has nothing to choose, and is only listed.
+func (a *App) accessoriesBody(details workspace.Details, choices []render.AccessoryChoice) {
+	for index, choice := range choices {
+		if index > 0 {
+			imgui.Spacing()
+		}
+
+		label := attachmentLabel(details, choice.Attachment)
+		gui.TextWrapped(label)
+		gui.Record(label)
+
+		if !choice.Drawn {
+			gui.DimmedText(textAccessoryNotDrawn)
+		}
+
+		if !beginPropertyTable(fmt.Sprintf("##accessory%d", index)) {
+			continue
+		}
+
+		propertyRow("Variation", choice.Variation)
+		a.accessoryChoices(index, choice, "Pattern", choice.PatternNames, choice.Pattern, func(at int) {
+			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, at, choice.Palette)
+		})
+		a.accessoryChoices(index, choice, "Palette", choice.PaletteNames, choice.Palette, func(at int) {
+			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, choice.Pattern, at)
+		})
+
+		imgui.EndTable()
+	}
+}
+
+// accessoryChoices writes one row of an accessory: what it is drawn with, and
+// where the variation offers more than one, a drop down to pick another.
+func (a *App) accessoryChoices(index int, choice render.AccessoryChoice, name string, alternatives []string, chosen int, pick func(at int)) {
+	if len(alternatives) == 0 {
+		return
+	}
+
+	imgui.TableNextRow()
+	imgui.TableNextColumn()
+	gui.TextDisabled(name)
+	imgui.TableNextColumn()
+
+	if len(alternatives) == 1 {
+		propertyValue(alternatives[0])
+
+		return
+	}
+
+	if !gui.BeginCombo(fmt.Sprintf("%s##accessory%d", name, index), alternatives[chosen]) {
+		return
+	}
+
+	for at, alternative := range alternatives {
+		if gui.ComboItem(fmt.Sprintf("%s##%s%d-%d", alternative, name, index, at), at == chosen) {
+			pick(at)
+		}
+	}
+
+	imgui.EndCombo()
+}
+
+// propertyValue writes the value of a row of a property table, and records it
+// for the tests.
+func propertyValue(value string) {
+	gui.TextWrapped(value)
+	gui.Record(value)
+}
 
 // attachedTree lists the attachments that hang from one, by its number: each
 // entity with the point it hangs from, opening onto its parts and onto what

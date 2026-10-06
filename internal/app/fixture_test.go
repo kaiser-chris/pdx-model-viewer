@@ -126,6 +126,93 @@ entity = {
 	attach = { left = "skinned_entity" right = "skinned_entity" }
 }
 `
+
+	// A belt is a portrait accessory: its game data names the mask that says
+	// where each pattern goes, and the variation that says what they are.
+	beltAsset = `
+pdxmesh = {
+	name = "belt_mesh"
+	file = "belt.mesh"
+	meshsettings = {
+		name = "quadShape"
+		index = 0
+		texture_diffuse = "statue_diffuse.png"
+		shader = "portrait_attachment_pattern"
+	}
+}
+
+entity = {
+	name = "belt_entity"
+	pdxmesh = "belt_mesh"
+	game_data = {
+		portrait_entity_user_data = {
+			portrait_accessory = {
+				pattern_mask = "gfx/models/portraits/belt/belt_masks.png"
+				variation = "fixture_belt"
+			}
+		}
+	}
+}
+`
+
+	// The same accessory on a mesh drawn by an effect that lays no pattern,
+	// which the game does not colour with it either.
+	plainBeltAsset = `
+pdxmesh = {
+	name = "plain_belt_mesh"
+	file = "belt.mesh"
+	meshsettings = {
+		name = "quadShape"
+		index = 0
+		texture_diffuse = "statue_diffuse.png"
+		shader = "standard"
+	}
+}
+
+entity = {
+	name = "plain_belt_entity"
+	pdxmesh = "plain_belt_mesh"
+	game_data = {
+		portrait_entity_user_data = {
+			portrait_accessory = {
+				pattern_mask = "gfx/models/portraits/belt/belt_masks.png"
+				variation = "fixture_belt"
+			}
+		}
+	}
+}
+`
+
+	// The variation of the fixture belt: two whole ways of patterning it and
+	// two of colouring it, which is what the viewer offers to pick between.
+	beltVariation = `
+pattern_textures = { name = "silk" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_textures = { name = "trim" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_layout = { name = "plain_layout" scale = 1 rotation = 0 offset = { x = 0 y = 0 } }
+
+variation = {
+	name = "fixture_belt"
+
+	pattern = {
+		weight = 1
+		r = { textures = "silk" layout = "plain_layout" }
+		g = { textures = "silk" layout = "plain_layout" }
+		b = { textures = "silk" layout = "plain_layout" }
+		a = { textures = "silk" layout = "plain_layout" }
+	}
+
+	pattern = {
+		weight = 1
+		r = { textures = "trim" layout = "plain_layout" }
+		g = { textures = "trim" layout = "plain_layout" }
+		b = { textures = "trim" layout = "plain_layout" }
+		a = { textures = "trim" layout = "plain_layout" }
+	}
+
+	color_palette = { weight = 1 texture = "gfx/portraits/accessory_variations/textures/fixture_red.png" }
+	color_palette = { weight = 1 texture = "gfx/portraits/accessory_variations/textures/fixture_blue.png" }
+}
+`
 )
 
 // A mod draws the statue's mesh, which only the game it is a mod of defines:
@@ -145,6 +232,10 @@ const (
 var (
 	fixtureRed  = color.NRGBA{R: 220, G: 30, B: 30, A: 255}
 	fixtureBlue = color.NRGBA{R: 30, G: 30, B: 220, A: 255}
+
+	// fixtureWhite covers everything and colours nothing, which is what a
+	// pattern mask and a pattern of a plain accessory do.
+	fixtureWhite = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 
 	// A flat normal and a plain, rough material.
 	fixtureNormal     = color.NRGBA{R: 128, G: 128, B: 255, A: 255}
@@ -205,6 +296,19 @@ func fixtureGame(t *testing.T) string {
 			statue + "skinned.mesh":          skinnedQuadFile(),
 			statue + "skinned_moved.anim":    movedAnimationFile(),
 			statue + "flock.asset":           []byte(flockAsset),
+			statue + "belt.asset":            []byte(beltAsset),
+			statue + "plain_belt.asset":      []byte(plainBeltAsset),
+			statue + "belt.mesh":             meshtest.QuadFile(2, 2),
+
+			// The variation of the belt, with the mask that says where each
+			// of its patterns goes and the palettes it draws them in. The
+			// pattern covers everything, as the plain silk of most of the
+			// shipped variations does.
+			"gfx/portraits/accessory_variations/fixture.txt":                []byte(beltVariation),
+			"gfx/models/portraits/belt/belt_masks.png":                      solid(t, fixtureWhite),
+			"gfx/portraits/accessory_variations/textures/fixture_masks.png": solid(t, fixtureWhite),
+			"gfx/portraits/accessory_variations/textures/fixture_red.png":   solid(t, fixtureRed),
+			"gfx/portraits/accessory_variations/textures/fixture_blue.png":  solid(t, fixtureBlue),
 
 			// Two seconds of a clip made at fifteen frames a second, and
 			// four of one made at thirty.

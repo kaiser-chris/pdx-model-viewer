@@ -131,6 +131,19 @@ the games' look rather than their own shaders and lighting. It tells from the
 name of each part's shader how to draw it: skin with the palette colour,
 decals laid over the rest, leaves and hair cut out by their alpha.
 
+A part whose entity's game data names a portrait accessory — a belt, a coat, a
+sash of Victoria 3 or Crusader Kings 3 — is drawn with the pattern and the
+colours of that accessory's variation: the mask the entity names says which
+pattern goes where, and the palette the variation names holds the colour of
+each of the mask's four channels. **Details** lists the accessories the model
+carries, each with the variation it is drawn with; the games pick one of a
+variation's patterns and one of its palettes at random, so where it offers
+more than one of either the viewer gives a drop down to pick between them, and
+draws what was picked without opening the entity again. An accessory whose
+effect lays no pattern is listed too, and said to be drawn by nothing, which
+is what the game does with it. Where the shaders that lay a pattern are not
+the games' own, what the viewer draws is an approximation of them.
+
 The palette colour is what the games blend in where a diffuse map's alpha says,
 such as a skin tone. It only shows on parts drawn as skin, so **Details**
 offers it only for an entity that has some, as the skin tone of a portrait.
@@ -173,6 +186,9 @@ What pdx-asset-go does not draw yet, the viewer does not show either:
 
 - the games' own shaders and the lighting of their environments: the look is
   an approximation;
+- the surface detail a pattern brings with it, since only the colour of an
+  accessory is drawn, and the shade and the row of a palette the games pick at
+  random, of which the viewer draws the first;
 - the files of `pdxmesh` definitions that no entity of the file draws.
 
 ## Building
