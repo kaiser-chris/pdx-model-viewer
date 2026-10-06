@@ -154,12 +154,71 @@ func MenuToggle(label, shortcut string, value *bool) bool {
 	return clicked
 }
 
-// Selectable is imgui.SelectableBoolV.
-func Selectable(label string, selected bool, flags imgui.SelectableFlags) bool {
-	clicked := imgui.SelectableBoolV(label, selected, flags, imgui.Vec2{})
+// The room a list leaves around its rows, around the text of each row, and
+// between one row and the next, in the units the interface was designed in.
+var (
+	listPadding    = imgui.Vec2{X: 6, Y: 6}
+	listRowPadding = imgui.Vec2{X: 8, Y: 4}
+)
+
+const listRowGap = 2
+
+// BeginList starts a scrolling list of rows that fills the space left, on a
+// background of its own with room around the rows. It is ended with EndList,
+// whatever it returns.
+func BeginList(id string) bool {
+	imgui.PushStyleColorVec4(imgui.ColChildBg, *imgui.StyleColorVec4(imgui.ColFrameBg))
+	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, ScaledVec2(listPadding.X, listPadding.Y))
+	imgui.PushStyleVarFloat(imgui.StyleVarChildRounding, imgui.CurrentStyle().FrameRounding())
+
+	open := imgui.BeginChildStrV(id, imgui.Vec2{}, imgui.ChildFlagsAlwaysUseWindowPadding, 0)
+
+	imgui.PopStyleVarV(2)
+	imgui.PopStyleColor()
+
+	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: imgui.CurrentStyle().ItemSpacing().X, Y: Scaled(listRowGap)})
+
+	return open
+}
+
+// EndList ends a list BeginList started.
+func EndList() {
+	imgui.PopStyleVar()
+	imgui.EndChild()
+}
+
+// ListRow is a row of a list that can be picked, as wide as the list, with
+// room around its text. It reports whether it was clicked.
+func ListRow(label string, selected bool) bool {
+	padding := ScaledVec2(listRowPadding.X, listRowPadding.Y)
+
+	// The list sits on the colour selectables are highlighted in elsewhere,
+	// so its rows are highlighted in the accent.
+	imgui.PushStyleColorVec4(imgui.ColHeader, withAlpha(colorAccent, 0.55))
+	imgui.PushStyleColorVec4(imgui.ColHeaderHovered, withAlpha(colorAccent, 0.35))
+	imgui.PushStyleColorVec4(imgui.ColHeaderActive, colorAccent)
+
+	clicked := imgui.SelectableBoolV("##"+label, selected, 0,
+		imgui.Vec2{Y: imgui.TextLineHeight() + 2*padding.Y})
 	record(label, selected)
 
+	imgui.PopStyleColorV(3)
+
+	origin := imgui.ItemRectMin()
+	imgui.WindowDrawList().AddTextVec2(imgui.Vec2{X: origin.X + padding.X, Y: origin.Y + padding.Y},
+		imgui.ColorU32Col(imgui.ColText), label)
+
 	return clicked
+}
+
+// ListPadding is the room a list leaves above and below its rows.
+func ListPadding() float32 {
+	return Scaled(listPadding.Y)
+}
+
+// ListRowPitch is how far one row of a list is below the one before it.
+func ListRowPitch() float32 {
+	return imgui.TextLineHeight() + 2*Scaled(listRowPadding.Y) + Scaled(listRowGap)
 }
 
 // InputText is a text field with a hint shown while it is empty.

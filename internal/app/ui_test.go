@@ -93,8 +93,28 @@ func TestPickAnEntity(t *testing.T) {
 		t.Errorf("statue = %v, painted statue = %v; want the one red and the other blue", red, blue)
 	}
 
-	if !driver.Exists(panelDetails, "painted") {
-		t.Error("the details do not show the painted statue's own shader")
+	if !driver.Exists(panelDetails, "Quad") {
+		t.Error("the details do not list the painted statue's part")
+	}
+}
+
+// The details describe each part in words: its name without the Shape Maya
+// adds, how it is drawn, and the texture maps that are missing.
+func TestDetailsDescribeTheParts(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "statue.asset"))
+	driver.Click(windowEntityList, "skin_entity")
+	waitForEntity(application, driver, "skin_entity")
+
+	for _, text := range []string{"Quad", "Solid, tinted with the palette colour", "No normal", "No properties"} {
+		if !driver.Exists(panelDetails, text) {
+			t.Errorf("the details do not say %q", text)
+		}
+	}
+
+	if driver.Exists(panelDetails, "No diffuse") {
+		t.Error("the details say the diffuse map is missing, which was found")
 	}
 }
 

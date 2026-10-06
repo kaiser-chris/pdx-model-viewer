@@ -12,6 +12,7 @@ import (
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
 	"github.com/kaiser-chris/pdx-model-viewer/internal/gui"
+	"github.com/kaiser-chris/pdx-model-viewer/internal/workspace"
 )
 
 // fullWidth is -FLT_MIN, Dear ImGui's way of saying "up to the right edge".
@@ -149,7 +150,7 @@ func (a *App) viewportMessage(origin, size imgui.Vec2) {
 	case document.selected == "" && len(document.listing.Entities) == 0:
 		title, detail = "Nothing to show", filepath.Base(document.location.File)+" defines no entities."
 	case document.selected == "":
-		title, detail = "Pick an entity", "Choose one of the entities of "+filepath.Base(document.location.File)+" on the left."
+		title, detail = "Pick an entity", "Choose one of the entities of "+filepath.Base(document.location.File)+" in the Entities panel."
 	case a.shown != nil && len(a.shown.loaded.Model.Parts) == 0:
 		title, detail = "Nothing to draw", "The mesh of "+document.selected+" holds no geometry, only points for other entities to attach to."
 	default:
@@ -280,11 +281,11 @@ func (a *App) entitiesBody() {
 		imgui.TextDisabled(fmt.Sprintf("%d of %s", len(shown), plural(len(entities), "entity", "entities")))
 	}
 
-	if imgui.BeginChildStrV("##entities", imgui.Vec2{}, imgui.ChildFlagsNone, 0) {
+	if gui.BeginList("##entities") {
 		for _, name := range shown {
 			selected := name == document.selected
 
-			if gui.Selectable(name, selected, 0) && !selected {
+			if gui.ListRow(name, selected) && !selected {
 				a.selectEntity(name)
 			}
 		}
@@ -296,7 +297,7 @@ func (a *App) entitiesBody() {
 		}
 	}
 
-	imgui.EndChild()
+	gui.EndList()
 }
 
 // stepThrough picks the entity before or after the one picked when an arrow
@@ -328,10 +329,11 @@ func (a *App) stepThrough(shown []string) {
 
 	a.selectEntity(shown[next])
 
-	// The rows are all one line high, so the row's place is known without
+	// The rows are all one height, so the row's place is known without
 	// laying it out again.
-	row := imgui.TextLineHeightWithSpacing()
-	imgui.SetScrollYFloat(min(max(imgui.ScrollY(), float32(next+1)*row-imgui.WindowHeight()), float32(next)*row))
+	row := gui.ListRowPitch()
+	visible := imgui.WindowHeight() - 2*gui.ListPadding()
+	imgui.SetScrollYFloat(min(max(imgui.ScrollY(), float32(next+1)*row-visible), float32(next)*row))
 }
 
 // noEntities explains a file that has nothing to pick, and lists the meshes
@@ -458,8 +460,9 @@ func propertyRow(name, value string) {
 	gui.Record(value)
 }
 
-// partsTable lists the parts of the model: the shapes of its mesh, what they
-// are drawn with, and which of their textures were found.
+// partsTable lists the parts of the model: the shapes of its mesh, how each
+// is drawn, which of their textures were found, and how large they are. The
+// names the files give them are in a tooltip, for whoever needs them.
 func (a *App) partsTable() {
 	parts := a.shown.loaded.Details.Parts
 	if len(parts) == 0 {
@@ -468,66 +471,99 @@ func (a *App) partsTable() {
 		return
 	}
 
-	flags := imgui.TableFlagsSizingFixedFit | imgui.TableFlagsRowBg | imgui.TableFlagsBordersInnerH
+	flags := imgui.TableFlagsSizingStretchProp | imgui.TableFlagsRowBg | imgui.TableFlagsBordersInnerH | imgui.TableFlagsPadOuterX
 
-	if !imgui.BeginTableV("##parts", 4, flags, imgui.Vec2{}, 0) {
+	if !imgui.BeginTableV("##parts", 2, flags, imgui.Vec2{}, 0) {
 		return
 	}
 
-	imgui.TableSetupColumnV("Shape", imgui.TableColumnFlagsWidthStretch, 0, 0)
-	imgui.TableSetupColumnV("Shader", 0, 0, 0)
-	imgui.TableSetupColumnV("Triangles", 0, 0, 0)
-	imgui.TableSetupColumnV("Textures", 0, 0, 0)
-	imgui.TableHeadersRow()
+	imgui.TableSetupColumnV("part", imgui.TableColumnFlagsWidthStretch, 0, 0)
+	// Wide enough for the largest count, and for the word under it.
+	sizeWidth := imgui.CalcTextSize("triangles").X
+	for _, part := range parts {
+		sizeWidth = max(sizeWidth, imgui.CalcTextSize(thousands(part.Triangles)).X)
+	}
+
+	imgui.TableSetupColumnV("size", imgui.TableColumnFlagsWidthFixed, sizeWidth, 0)
+
+	padding := gui.Scaled(4)
 
 	for _, part := range parts {
-		imgui.TableNextRow()
+		imgui.TableNextRowV(0, 0)
 
 		imgui.TableNextColumn()
-		imgui.TextUnformatted(part.Name)
-		gui.Record(part.Name)
+		imgui.Dummy(imgui.Vec2{Y: padding})
 
-		imgui.TableNextColumn()
-		imgui.TextUnformatted(part.Shader)
-		gui.Record(part.Shader)
+		name := partName(part.Name)
 
-		imgui.TableNextColumn()
-		imgui.TextUnformatted(fmt.Sprint(part.Triangles))
-		imgui.SetItemTooltip(plural(part.Vertices, "vertex", "vertices"))
+		gui.PushStrongFont()
+		imgui.TextUnformatted(name)
+		gui.PopFont()
+		gui.Record(name)
+		imgui.SetItemTooltip(partTooltip(part))
 
-		imgui.TableNextColumn()
+		gui.DimmedText(partLook(part))
 
 		if part.Drawn {
-			textureMarks(part.Diffuse, part.Normal, part.Properties)
-		} else {
-			imgui.TextDisabled("not drawn")
-			imgui.SetItemTooltip("The shape has no mesh settings, so the game does not draw it: a collision shape, for one")
-			gui.Record("not drawn")
+			textureMaps(part)
 		}
+
+		imgui.Dummy(imgui.Vec2{Y: padding})
+
+		imgui.TableNextColumn()
+		imgui.Dummy(imgui.Vec2{Y: padding})
+		rightAligned(thousands(part.Triangles), false)
+		imgui.SetItemTooltip(plural(part.Vertices, "vertex", "vertices"))
+		rightAligned("triangles", true)
 	}
 
 	imgui.EndTable()
 }
 
-// textureMarks writes D, N and P for the diffuse, normal and properties map,
-// dimmed for one that was not found and is drawn with a stand in.
-func textureMarks(found ...bool) {
-	for index, mark := range []struct{ letter, name string }{
-		{"D", "diffuse map"},
-		{"N", "normal map"},
-		{"P", "properties map"},
+// partTooltip names a part the way its files do.
+func partTooltip(part workspace.PartDetails) string {
+	shader := part.Shader
+	if shader == "" {
+		shader = "none"
+	}
+
+	return "Shape: " + part.Name + "\nShader: " + shader
+}
+
+// textureMaps says which texture maps of a part were found, and which are
+// drawn with a stand in.
+func textureMaps(part workspace.PartDetails) {
+	for index, texture := range []struct {
+		name  string
+		found bool
+	}{
+		{"Diffuse", part.Diffuse},
+		{"Normal", part.Normal},
+		{"Properties", part.Properties},
 	} {
 		if index > 0 {
 			imgui.SameLine()
 		}
 
-		if found[index] {
-			imgui.TextUnformatted(mark.letter)
-			imgui.SetItemTooltip("The " + mark.name + " was found")
+		if texture.found {
+			imgui.TextDisabled(texture.name)
+			imgui.SetItemTooltip("The " + strings.ToLower(texture.name) + " map was found")
 		} else {
-			imgui.TextDisabled(mark.letter)
-			imgui.SetItemTooltip("No " + mark.name + "; drawn with a neutral stand in")
+			label := "No " + strings.ToLower(texture.name)
+			gui.WarningText(label)
+			imgui.SetItemTooltip("The " + strings.ToLower(texture.name) + " map was not found; drawn with a stand in")
 		}
+	}
+}
+
+// rightAligned writes a line of text against the right edge of a column.
+func rightAligned(text string, dimmed bool) {
+	imgui.SetCursorPosX(imgui.CursorPosX() + imgui.ContentRegionAvail().X - imgui.CalcTextSize(text).X)
+
+	if dimmed {
+		imgui.TextDisabled(text)
+	} else {
+		imgui.TextUnformatted(text)
 	}
 }
 

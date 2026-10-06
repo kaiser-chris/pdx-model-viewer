@@ -16,6 +16,7 @@ import (
 
 	"github.com/kaiser-chris/pdx-asset-go/entity"
 	"github.com/kaiser-chris/pdx-asset-go/model"
+	"github.com/kaiser-chris/pdx-asset-go/render"
 	"github.com/kaiser-chris/pdx-asset-go/texture"
 )
 
@@ -206,6 +207,10 @@ type PartDetails struct {
 	Name   string
 	Shader string
 
+	// Style is how the viewer draws the part, which it tells from the
+	// shader's name.
+	Style render.Style
+
 	Vertices, Triangles int
 
 	// Which of its textures were found. One that was not is drawn with a
@@ -275,6 +280,7 @@ func (g *Game) describe(name string, built *model.Model) Details {
 		described := PartDetails{
 			Name:       part.Name,
 			Shader:     part.Shader,
+			Style:      render.StyleOf(&part),
 			Diffuse:    part.Textures.Diffuse != nil,
 			Normal:     part.Textures.Normal != nil,
 			Properties: part.Textures.Properties != nil,

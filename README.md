@@ -47,7 +47,7 @@ kept while the viewer runs, so the next file of the same game opens at once.
 ### Viewing
 
 A file with one entity shows it at once; a file with several lists them on the
-left, to pick one from. The arrow keys step through the list, and the search
+right, to pick one from. The arrow keys step through the list, and the search
 box narrows it down.
 
 | In the viewport                | Effect                          |
@@ -59,10 +59,12 @@ box narrows it down.
 | `T`                            | Turn the model by itself        |
 
 **Details** shows how the entity is put together: where it is defined, the
-entities it clones, its mesh, and each shape of the mesh with its shader,
-triangles and which textures were found (**D**iffuse, **N**ormal,
-**P**roperties). Shapes the game does not draw, such as collision shapes, are
-listed as such and left out. **Problems** lists what could not be read, such as
+entities it clones, its mesh, and each part of the mesh in words: its name,
+how it is drawn (solid, laid over the model like a decal, cut out like
+leaves), which of its diffuse, normal and properties maps are missing, and its
+triangles. The names the files give a part and its shader show when the
+pointer rests on its name. Parts the game does not draw, such as collision
+shapes, are listed as such and left out. **Problems** lists what could not be read, such as
 a texture that was not found, which is drawn with a neutral stand in.
 
 The models are drawn with a shader of the viewer's own, an approximation of
@@ -74,9 +76,12 @@ The palette colour is what the games blend in where a diffuse map's alpha says,
 such as a skin tone. The viewer picks a skin tone for a portrait's skin and no
 tint for anything else, until you pick one yourself.
 
-The layout of the panels is kept in `%AppData%\pdx-model-viewer` on Windows and
-in `~/.config/pdx-model-viewer` on Linux. **View → Reset Layout** puts them
-back.
+The viewer opens maximized the first time, and after that the way it was
+closed: maximized or not, and at the size and place it had. The window and
+the layout of the panels are kept in `%AppData%\pdx-model-viewer` on Windows
+and in `~/.config/pdx-model-viewer` on Linux. **View → Reset Layout** puts the
+panels back: the viewport on the left, and on the right the entities above
+the details.
 
 ### Not supported yet
 

@@ -24,10 +24,11 @@ const (
 // needs this one: it marks the root node as able to host a dock space.
 const dockNodeFlagsDockSpace imgui.DockNodeFlags = 1 << 10
 
-// The shares of the window the side panels take in the default layout.
+// The shares the side panels take in the default layout: the column of the
+// window they share, and the part of that column the entities take.
 const (
-	entitiesRatio = 0.22
-	detailsRatio  = 0.3
+	sideRatio     = 0.25
+	entitiesRatio = 0.4
 )
 
 // dockSpace covers the remaining viewport with a dock space so every panel can
@@ -41,25 +42,23 @@ func (a *App) dockSpace() {
 	}
 }
 
-// buildDefaultLayout puts the entities on the left, the details on the right
-// and the viewport between them. It only runs when there is no saved layout,
-// or when the user resets it.
+// buildDefaultLayout puts the viewport on the left and a column on the right,
+// with the entities at its top and the details below them. It only runs when
+// there is no saved layout, or when the user resets it.
 func (a *App) buildDefaultLayout(dockSpaceID imgui.ID) {
 	imgui.InternalDockBuilderRemoveNode(dockSpaceID)
 	imgui.InternalDockBuilderAddNodeV(dockSpaceID, dockNodeFlagsDockSpace)
 	imgui.InternalDockBuilderSetNodeSize(dockSpaceID, imgui.MainViewport().WorkSize())
 
-	var left, rest imgui.ID
-	imgui.InternalDockBuilderSplitNode(dockSpaceID, imgui.DirLeft, entitiesRatio, &left, &rest)
+	var side, center imgui.ID
+	imgui.InternalDockBuilderSplitNode(dockSpaceID, imgui.DirRight, sideRatio, &side, &center)
 
-	// The details take their share of the whole window, not of what the
-	// entities left.
-	var right, center imgui.ID
-	imgui.InternalDockBuilderSplitNode(rest, imgui.DirRight, detailsRatio/(1-entitiesRatio), &right, &center)
+	var top, bottom imgui.ID
+	imgui.InternalDockBuilderSplitNode(side, imgui.DirUp, entitiesRatio, &top, &bottom)
 
-	imgui.InternalDockBuilderDockWindow(panelEntities, left)
 	imgui.InternalDockBuilderDockWindow(panelViewport, center)
-	imgui.InternalDockBuilderDockWindow(panelDetails, right)
+	imgui.InternalDockBuilderDockWindow(panelEntities, top)
+	imgui.InternalDockBuilderDockWindow(panelDetails, bottom)
 
 	imgui.InternalDockBuilderFinish(dockSpaceID)
 }

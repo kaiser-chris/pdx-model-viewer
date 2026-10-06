@@ -29,7 +29,7 @@ const (
 	applicationName = "PDX Model Viewer"
 
 	// configFolder is the folder below the user's configuration directory
-	// the layout of the panels is kept in.
+	// the layout of the panels and the place of the window are kept in.
 	configFolder = "pdx-model-viewer"
 
 	defaultWindowWidth  = 1280
@@ -128,7 +128,7 @@ type shownEntity struct {
 // Options changes how the application starts. The zero value is what a user
 // gets; the interface tests fill it in.
 type Options struct {
-	// ConfigDir holds the saved layout of the panels. Empty means the
+	// ConfigDir holds the saved layout and window placement. Empty means the
 	// user's configuration directory.
 	ConfigDir string
 
@@ -159,7 +159,9 @@ func Run(file string) error {
 // New creates the window and what the models are drawn with. It must be
 // called from the main goroutine.
 func New(options Options) (*App, error) {
-	layout := layoutPath(options.ConfigDir)
+	config := configDir(options.ConfigDir)
+	layout := configFile(config, "layout.ini")
+	placementFile := configFile(config, "window.json")
 
 	application := &App{
 		games:        map[string]*workspace.Game{},
@@ -186,7 +188,12 @@ func New(options Options) (*App, error) {
 		Hidden:     options.Hidden,
 	})
 
-	application.window.SizeForScale(defaultWindowWidth, defaultWindowHeight, application.interfaceScale())
+	placement := loadPlacement(placementFile)
+	if placement.Width == 0 || placement.Height == 0 {
+		application.window.SizeForScale(defaultWindowWidth, defaultWindowHeight, application.interfaceScale())
+	}
+
+	application.window.Place(placement, options.Hidden)
 	application.dialogs = systemDialogs{parent: dialogParent()}
 
 	// Everything below needs the OpenGL context the window just created.
@@ -205,6 +212,7 @@ func New(options Options) (*App, error) {
 	application.dockWindowClass = imgui.NewWindowClass()
 
 	application.window.OnShutdown(func() {
+		savePlacement(placementFile, application.window.Placement())
 		application.unloadShown()
 		application.viewer.Unload()
 		application.renderer.Unload()
@@ -523,9 +531,9 @@ func (a *App) setStatus(format string, args ...any) {
 	a.status = fmt.Sprintf(format, args...)
 }
 
-// layoutPath is where Dear ImGui keeps the layout of the panels, or nothing
-// when there is no configuration directory to keep it in.
-func layoutPath(dir string) string {
+// configDir is the folder the layout of the panels and the place of the
+// window are kept in, or nothing when there is no configuration directory.
+func configDir(dir string) string {
 	if dir == "" {
 		base, err := os.UserConfigDir()
 		if err != nil {
@@ -543,7 +551,16 @@ func layoutPath(dir string) string {
 		return ""
 	}
 
-	return filepath.Join(dir, "layout.ini")
+	return dir
+}
+
+// configFile is a file of the configuration folder, or nothing without one.
+func configFile(dir, name string) string {
+	if dir == "" {
+		return ""
+	}
+
+	return filepath.Join(dir, name)
 }
 
 func fileExists(path string) bool {
