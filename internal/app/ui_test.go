@@ -5,11 +5,14 @@ package app
 import (
 	"math"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/AllenDang/cimgui-go/imgui"
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	"github.com/kaiser-chris/pdx-model-viewer/internal/workspace"
 )
 
 // The windows the entity list and the error popup are laid out in. The list
@@ -413,4 +416,43 @@ func redder(c interface{ RGBA() (r, g, b, a uint32) }) bool {
 	r, g, b, _ := c.RGBA()
 
 	return r > g+0x2000 && r > b+0x2000
+}
+
+// The statue is lit by the game's own environment at first, and by another
+// of its environments, or the built in one, once picked; the game is lit by
+// the pick for its next file too.
+func TestPickAnEnvironment(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "pedestal.asset"))
+	waitForEntity(application, driver, "pedestal_entity")
+
+	opened := application.document
+	if want := []string{"gfx/map/environment/environment.txt", "gfx/map/environment/portrait_environment.txt"}; !slices.Equal(opened.environments, want) {
+		t.Errorf("environments = %v, want %v", opened.environments, want)
+	}
+
+	if opened.environment != "gfx/map/environment/environment.txt" {
+		t.Errorf("environment = %q, want the game's own", opened.environment)
+	}
+
+	driver.Click(panelDetails, "##environment")
+	driver.Click("", "gfx/map/environment/portrait_environment.txt")
+
+	if opened.environment != "gfx/map/environment/portrait_environment.txt" || opened.lighting.Environment.Constants["SunIntensity"][0] != 3 {
+		t.Errorf("environment = %q, want the portrait environment picked", opened.environment)
+	}
+
+	driver.Click(panelDetails, "##environment")
+	driver.Click("", builtInEnvironment)
+
+	if opened.environment != workspace.BuiltIn {
+		t.Errorf("environment = %q, want the built in one", opened.environment)
+	}
+
+	openFile(t, application, driver, fixtureFile(t, "statue.asset"))
+
+	if application.document.environment != workspace.BuiltIn {
+		t.Errorf("the next file of the game is lit by %q, want the pick", application.document.environment)
+	}
 }

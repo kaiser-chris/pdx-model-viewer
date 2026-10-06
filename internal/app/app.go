@@ -18,8 +18,10 @@ import (
 	"github.com/AllenDang/cimgui-go/imgui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"github.com/kaiser-chris/pdx-asset-go/environment"
 	"github.com/kaiser-chris/pdx-asset-go/render"
 	"github.com/kaiser-chris/pdx-asset-go/shader"
+	"github.com/kaiser-chris/pdx-asset-go/texture"
 
 	"github.com/kaiser-chris/pdx-model-viewer/assets"
 	"github.com/kaiser-chris/pdx-model-viewer/internal/gui"
@@ -61,6 +63,10 @@ type App struct {
 	// games are the games and mods whose files have been read, by their root,
 	// so that opening another file of the same game does not read it again.
 	games map[string]*workspace.Game
+
+	// environments are the environments picked for the games, by their
+	// root, kept for the next file of the same game.
+	environments map[string]string
 
 	// document is the asset file open now, and opening the one being opened.
 	document *document
@@ -117,6 +123,17 @@ type document struct {
 	listing  workspace.Listing
 	game     *workspace.Game
 
+	// environments are the environment files of the game the entities can
+	// be lit with, and environment the one they are lit with, or
+	// workspace.BuiltIn.
+	environments []string
+	environment  string
+
+	// lighting is the environment the file's entities are lit with, and
+	// lightingErr why there is none, or not all of it.
+	lighting    *workspace.Lighting
+	lightingErr error
+
 	// selected is the entity picked from the file, and failure why it could
 	// not be shown.
 	selected string
@@ -168,6 +185,7 @@ func New(options Options) (*App, error) {
 
 	application := &App{
 		games:        map[string]*workspace.Game{},
+		environments: map[string]string{},
 		showEntities: true,
 		showDetails:  true,
 		layoutBuilt:  fileExists(layout),
@@ -321,6 +339,7 @@ func (a *App) Open(file string) {
 	// The game is looked up here rather than in the job, since the jobs must
 	// not touch the application's state.
 	known := a.games[location.Root]
+	picked, wasPicked := a.environments[location.Root]
 
 	a.opening = start(func() (*document, error) {
 		opened := &document{location: location, listing: workspace.List(location), game: known}
@@ -333,6 +352,20 @@ func (a *App) Open(file string) {
 
 			opened.game = game
 		}
+
+		// The environment picked for the game before, if it is still
+		// there, or the game's own, or the built in one without any.
+		opened.environments = opened.game.Environments(location)
+		opened.environment = workspace.BuiltIn
+
+		switch {
+		case wasPicked && (picked == workspace.BuiltIn || slices.Contains(opened.environments, picked)):
+			opened.environment = picked
+		case len(opened.environments) > 0:
+			opened.environment = opened.environments[0]
+		}
+
+		opened.lighting, opened.lightingErr = opened.game.Lighting(location, opened.environment)
 
 		return opened, nil
 	})
@@ -377,6 +410,8 @@ func (a *App) pollOpening() {
 		a.shaderSource = source
 	}
 
+	a.useLighting(opened)
+
 	rl.SetWindowTitle(filepath.Base(opened.location.File) + " - " + applicationName)
 
 	entities := opened.listing.Entities
@@ -394,6 +429,51 @@ func (a *App) pollOpening() {
 		a.selectEntity(entities[0])
 	default:
 		a.setStatus("%s defines %d entities; pick one to view it", filepath.Base(opened.location.File), len(entities))
+	}
+}
+
+// useLighting lights the games' effects with the environment of the file's
+// game. Without one, it is the library's defaults; without its map, the
+// effects keep their basic defaults for it. The problem goes to the standard
+// error.
+func (a *App) useLighting(opened *document) {
+	if opened.lightingErr != nil {
+		warn(opened.lightingErr)
+	}
+
+	var (
+		lighting *environment.Environment
+		cube     *texture.Cube
+	)
+
+	if opened.lighting != nil {
+		lighting, cube = opened.lighting.Environment, opened.lighting.Map
+	}
+
+	if err := a.renderer.SetEnvironment(lighting, cube); err != nil {
+		warn(err)
+		_ = a.renderer.SetEnvironment(lighting, nil)
+	}
+}
+
+// chooseEnvironment lights the open file's entities with another of the
+// game's environments, or the built in one.
+func (a *App) chooseEnvironment(file string) {
+	opened := a.document
+	if opened == nil || file == opened.environment {
+		return
+	}
+
+	opened.environment = file
+	opened.lighting, opened.lightingErr = opened.game.Lighting(opened.location, file)
+	a.environments[opened.location.Root] = file
+
+	a.useLighting(opened)
+
+	if file == workspace.BuiltIn {
+		a.setStatus("Lit by the built in environment")
+	} else {
+		a.setStatus("Lit by %s", file)
 	}
 }
 

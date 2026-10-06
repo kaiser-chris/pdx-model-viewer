@@ -3,6 +3,7 @@ package workspace
 import (
 	"cmp"
 	"fmt"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,8 +16,10 @@ import (
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
 	"github.com/kaiser-chris/pdx-asset-go/entity"
+	"github.com/kaiser-chris/pdx-asset-go/environment"
 	"github.com/kaiser-chris/pdx-asset-go/model"
 	"github.com/kaiser-chris/pdx-asset-go/shader"
+	"github.com/kaiser-chris/pdx-asset-go/texture"
 )
 
 // Listing is what one asset file defines.
@@ -137,6 +140,101 @@ func (g *Game) ShaderSource(location Location) shader.Source {
 	}
 
 	return shader.Folders{Set: g.set, Layer: layer}
+}
+
+// Lighting is the environment the game lights its world with, and its
+// environment map, decoded.
+type Lighting struct {
+	Environment *environment.Environment
+	Map         *texture.Cube
+}
+
+// BuiltIn names the library's own environment, which lights the entities
+// of a game that has no environment files.
+const BuiltIn = ""
+
+// Environments are the environment files the entities of an asset file can
+// be lit with, as the game's model editor offers them: those of the folder
+// the game's own environment file is in, that game's own first. A game with
+// none has none; its entities are lit by the built in environment.
+func (g *Game) Environments(location Location) []string {
+	source := g.ShaderSource(location)
+	configured := environment.ConfiguredPath(source)
+
+	files, _ := g.set.Files(folders.Folder{Path: path.Dir(configured)})
+
+	var found []string
+
+	for _, file := range files {
+		relative := file.Relative
+		if file.Layer != "" {
+			relative = strings.TrimPrefix(relative, file.Layer+"/")
+		}
+
+		if slices.Contains(found, relative) {
+			continue
+		}
+
+		data, err := source.ReadFile(relative)
+		if err != nil || !environment.IsEnvironment(string(data)) {
+			continue
+		}
+
+		found = append(found, relative)
+	}
+
+	slices.SortStableFunc(found, func(a, b string) int {
+		switch {
+		case a == configured:
+			return -1
+		case b == configured:
+			return 1
+		}
+
+		return strings.Compare(a, b)
+	})
+
+	return found
+}
+
+// Lighting reads an environment the entities of an asset file are lit with,
+// and the environment map it names: one of Environments, or for BuiltIn the
+// library's own. Without the file it is the library's defaults, and when its
+// map cannot be read the library's, and the error says why.
+func (g *Game) Lighting(location Location, file string) (*Lighting, error) {
+	if file == BuiltIn {
+		return &Lighting{Environment: environment.Default(), Map: environment.DefaultCube()}, nil
+	}
+
+	source := g.ShaderSource(location)
+
+	read, err := environment.LoadFile(source, file)
+	if err != nil {
+		return &Lighting{Environment: read, Map: environment.DefaultCube()}, err
+	}
+
+	// An environment that names no map gives no light from around, as the
+	// game draws Victoria 3's environment_greyscale.txt; one whose map cannot
+	// be read has the library's.
+	if read.Cubemap == "" {
+		return &Lighting{Environment: read}, nil
+	}
+
+	lighting := &Lighting{Environment: read, Map: environment.DefaultCube()}
+
+	data, err := source.ReadFile(read.Cubemap)
+	if err != nil {
+		return lighting, fmt.Errorf("the environment map %s: %w", read.Cubemap, err)
+	}
+
+	cube, err := texture.DecodeCube(data)
+	if err != nil {
+		return lighting, fmt.Errorf("the environment map %s: %w", read.Cubemap, err)
+	}
+
+	lighting.Map = cube
+
+	return lighting, nil
 }
 
 // Entities is how many entities the game defines.

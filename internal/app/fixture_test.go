@@ -111,6 +111,13 @@ func fixtureGame(t *testing.T) string {
 			statue + "pedestal.asset":        []byte(pedestalAsset),
 			statue + "meshes.asset":          []byte(meshesAsset),
 			"../loose/outside.asset":         []byte(pedestalAsset),
+
+			// Two environments to light the statue with, and a file of the
+			// same folder that is none.
+			"paths.settings":                               []byte(`gfx_environment_file = "gfx/map/environment/environment.txt"`),
+			"gfx/map/environment/environment.txt":          []byte("sun_intensity = 5"),
+			"gfx/map/environment/portrait_environment.txt": []byte("sun_intensity = 3"),
+			"gfx/map/environment/daynight_settings.txt":    []byte("day_length = 10"),
 		}
 
 		for name, content := range files {

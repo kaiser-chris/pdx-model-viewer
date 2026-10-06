@@ -12,6 +12,7 @@ import (
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
 	"github.com/kaiser-chris/pdx-model-viewer/internal/gui"
+	"github.com/kaiser-chris/pdx-model-viewer/internal/workspace"
 )
 
 // fullWidth is -FLT_MIN, Dear ImGui's way of saying "up to the right edge".
@@ -557,6 +558,8 @@ func problemText(problem report.Diagnostic) {
 func (a *App) displaySettings() {
 	look := &a.viewer.Look
 
+	a.environmentChoice()
+
 	// The palette colour is the viewer's own shader's; the games' effects
 	// take their colours from the asset and the engine.
 	if a.shown == nil || !a.shown.model.UsesOwnShader() {
@@ -581,6 +584,61 @@ func (a *App) displaySettings() {
 		a.resetCamera()
 	}
 }
+
+// environmentChoice picks the environment the entities are lit with, among
+// the game's environment files, as the game's own model editor does. A game
+// without any is lit by the built in environment.
+func (a *App) environmentChoice() {
+	opened := a.document
+	if opened == nil {
+		return
+	}
+
+	imgui.TextDisabled("Environment")
+	imgui.SetNextItemWidth(fullWidth)
+
+	if len(opened.environments) == 0 {
+		imgui.BeginDisabled()
+		if gui.BeginCombo("##environment", builtInEnvironment) {
+			imgui.EndCombo()
+		}
+		imgui.EndDisabled()
+
+		if imgui.IsItemHoveredV(imgui.HoveredFlagsAllowWhenDisabled) {
+			imgui.SetTooltip("The game has no environment files; the built in environment lights the models")
+		}
+
+		return
+	}
+
+	preview := opened.environment
+	if preview == workspace.BuiltIn {
+		preview = builtInEnvironment
+	}
+
+	if gui.BeginCombo("##environment", preview) {
+		for _, file := range opened.environments {
+			if gui.Selectable(file, file == opened.environment, 0) {
+				a.chooseEnvironment(file)
+			}
+		}
+
+		if gui.Selectable(builtInEnvironment, opened.environment == workspace.BuiltIn, 0) {
+			a.chooseEnvironment(workspace.BuiltIn)
+		}
+
+		imgui.EndCombo()
+	}
+
+	if opened.lightingErr != nil {
+		gui.WarningText(opened.lightingErr.Error())
+	}
+
+	imgui.Spacing()
+}
+
+// builtInEnvironment is how the built in environment is listed.
+const builtInEnvironment = "Built in"
 
 // colorVec4 turns a raylib colour into a Dear ImGui one.
 func colorVec4(color rl.Color) imgui.Vec4 {

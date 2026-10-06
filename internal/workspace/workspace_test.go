@@ -249,3 +249,70 @@ func TestPortrait(t *testing.T) {
 		}
 	}
 }
+
+// The environments are the environment files of the folder the game's own is
+// in, that one first; other files of the folder are not environments.
+func TestEnvironments(t *testing.T) {
+	root := game(t)
+
+	tree(t, root, map[string]string{
+		"paths.settings":                            `gfx_environment_file = "gfx/map/environment/environment.txt"`,
+		"gfx/map/environment/environment.txt":       "sun_intensity = 5",
+		"gfx/map/environment/a_ui_environment.txt":  "sun_intensity = 3\ncubemap_intensity = 1",
+		"gfx/map/environment/daynight_settings.txt": "day_length = 10",
+	})
+
+	location, err := Locate(filepath.Join(root, "gfx", "models", "statue", "statue_entities.asset"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opened, err := OpenGame(location.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{"gfx/map/environment/environment.txt", "gfx/map/environment/a_ui_environment.txt"}
+	if got := opened.Environments(location); !slices.Equal(got, want) {
+		t.Errorf("environments = %v, want %v", got, want)
+	}
+
+	lighting, err := opened.Lighting(location, "gfx/map/environment/a_ui_environment.txt")
+	if err != nil || lighting.Environment.Constants["SunIntensity"][0] != 3 {
+		t.Errorf("lighting = %+v, %v, want the picked environment", lighting, err)
+	}
+
+	// It names no environment map, so it has none.
+	if lighting.Map != nil {
+		t.Errorf("environment map = %+v, want none", lighting.Map)
+	}
+}
+
+// A game without environment files lists none, and its entities are lit by
+// the built in environment.
+func TestBuiltInEnvironment(t *testing.T) {
+	location, err := Locate(filepath.Join(game(t), "gfx", "models", "statue", "statue_entities.asset"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opened, err := OpenGame(location.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := opened.Environments(location); len(got) != 0 {
+		t.Errorf("environments = %v, want none", got)
+	}
+
+	lighting, err := opened.Lighting(location, BuiltIn)
+	if err != nil || lighting.Environment == nil || lighting.Environment.Path != "" || len(lighting.Environment.Constants) == 0 {
+		t.Errorf("lighting = %+v, %v, want the built in environment", lighting, err)
+	}
+
+	// With an environment map of its own, rather than none, which once lit
+	// everything as if by a white sky.
+	if lighting.Map == nil || lighting.Map.Size != 1 {
+		t.Errorf("environment map = %+v, want the built in one", lighting.Map)
+	}
+}
