@@ -134,8 +134,10 @@ decals laid over the rest, leaves and hair cut out by their alpha.
 A part whose entity's game data names a portrait accessory — a belt, a coat, a
 sash of Victoria 3 or Crusader Kings 3 — is drawn with the pattern and the
 colours of that accessory's variation: the mask the entity names says which
-pattern goes where, and the palette the variation names holds the colour of
-each of the mask's four channels. **Details** ends with a **Variation** section:
+pattern goes where, the palette the variation names holds the colour of each of
+the mask's four channels, and the normal map and the properties map the pattern
+brings are the surface of the accessory, drawn in the place of the mesh's own
+where the pattern covers a pixel. **Details** ends with a **Variation** section:
 each entity that carries an accessory, named by the variation it is drawn with,
 and under that the patterns and the colour palettes the variation offers, each
 listed the way a file's entities are, across the whole width of the panel.
@@ -188,9 +190,8 @@ What pdx-asset-go does not draw yet, the viewer does not show either:
 
 - the games' own shaders and the lighting of their environments: the look is
   an approximation;
-- the surface detail a pattern brings with it, since only the colour of an
-  accessory is drawn, and the shade and the row of a palette the games pick at
-  random, of which the viewer draws the first;
+- the shade and the row of a colour palette, which the games pick at random
+  and of which the viewer draws the first;
 - the files of `pdxmesh` definitions that no entity of the file draws.
 
 ## Building
