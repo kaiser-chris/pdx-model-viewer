@@ -161,7 +161,7 @@ func ErrorText(text string) {
 
 func coloredWrapped(color imgui.Vec4, text string) {
 	imgui.PushStyleColorVec4(imgui.ColText, color)
-	imgui.TextWrapped(text)
+	TextWrapped(text)
 	imgui.PopStyleColor()
 
 	// Recorded like a widget, so that a test can find what was said.

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/AllenDang/cimgui-go/imgui"
@@ -74,8 +75,14 @@ func (a *App) menuBar() {
 			a.askForAssetFile()
 		}
 
+		a.recentMenu()
+
 		if gui.MenuItem("Reload", "F5", a.document != nil && a.opening == nil) {
 			a.reload()
+		}
+
+		if gui.MenuItem("Export...", "Ctrl+E", a.canExport()) {
+			a.showExport = true
 		}
 
 		imgui.Separator()
@@ -119,6 +126,54 @@ func (a *App) menuBar() {
 	}
 }
 
+// The label of the Recent menu, and of what it says without recent files.
+const (
+	menuRecent     = "Recent"
+	labelNoRecents = "No recent files"
+)
+
+// recentMenu lists the files opened last, to open one again.
+func (a *App) recentMenu() {
+	if !gui.BeginMenu(menuRecent) {
+		return
+	}
+	defer imgui.EndMenu()
+
+	files := a.settings.RecentFiles
+	if len(files) == 0 {
+		gui.MenuItem(labelNoRecents, "", false)
+
+		return
+	}
+
+	for index, file := range files {
+		// The folder the file is in tells apart files of one name, which
+		// the assets of the games often share.
+		name := filepath.Base(file)
+		folder := filepath.Base(filepath.Dir(file))
+
+		clicked := gui.MenuItem(fmt.Sprintf("%s##recent%d", name, index), folder, a.opening == nil)
+		gui.Tooltip(file)
+
+		if clicked {
+			a.openRecent(file)
+		}
+	}
+}
+
+// openRecent opens a recent file again, or takes it off the list if it is
+// not there any more.
+func (a *App) openRecent(file string) {
+	if !fileExists(file) {
+		a.forgetRecentFile(file)
+		a.setStatus("%s is no longer there, so it was taken off the recent files", file)
+
+		return
+	}
+
+	a.Open(file)
+}
+
 // statusBar claims a strip along the bottom of the viewport. It is submitted
 // before the dock space so that panels do not overlap it.
 func (a *App) statusBar() {
@@ -133,7 +188,7 @@ func (a *App) statusBar() {
 			// Right align the diagnostics.
 			imgui.SameLine()
 			imgui.SetCursorPosX(imgui.ContentRegionAvail().X - imgui.CalcTextSize(right).X)
-			imgui.TextDisabled(right)
+			gui.TextDisabled(right)
 
 			imgui.EndMenuBar()
 		}
@@ -173,6 +228,8 @@ func (a *App) handleShortcuts() {
 	switch {
 	case io.KeyCtrl() && imgui.IsKeyPressedBool(imgui.KeyO):
 		a.askForAssetFile()
+	case io.KeyCtrl() && imgui.IsKeyPressedBool(imgui.KeyE):
+		a.showExport = true
 	case imgui.IsKeyPressedBool(imgui.KeyF5):
 		a.reload()
 	case imgui.IsKeyPressedBool(imgui.KeyHome):
@@ -194,7 +251,7 @@ func (a *App) errorPopup() {
 		return
 	}
 
-	imgui.TextWrapped(a.openError)
+	gui.TextWrapped(a.openError)
 	gui.Record(a.openError)
 
 	imgui.Spacing()
@@ -225,10 +282,10 @@ func (a *App) aboutPopup() {
 	gui.PushStrongFont()
 	imgui.TextUnformatted(applicationName)
 	gui.PopFont()
-	imgui.TextDisabled("Version " + applicationVersion)
+	gui.TextDisabled("Version " + applicationVersion)
 
 	imgui.Spacing()
-	imgui.TextWrapped("Views the 3D models of the asset files of Victoria 3, Europa Universalis 5 and Crusader Kings 3.")
+	gui.TextWrapped("Views the 3D models of the asset files of Victoria 3, Europa Universalis 5 and Crusader Kings 3.")
 	imgui.Spacing()
 
 	gui.DimmedText("Reads the games' files with pdx-asset-go and pdx-parser-go, and draws with raylib and Dear ImGui. Set in Roboto, under the SIL Open Font License.")

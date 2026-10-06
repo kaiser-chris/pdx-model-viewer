@@ -64,6 +64,9 @@ type Window struct {
 	shutdown func()
 	closing  bool
 
+	// closed is set once the window is closed, which only happens once.
+	closed bool
+
 	// allowClose decides whether a close the user asked for goes ahead.
 	allowClose func() bool
 
@@ -233,8 +236,15 @@ func (w *Window) Step(frame Frame) {
 	}
 }
 
-// Close releases the application's GPU resources and closes the window.
+// Close releases the application's GPU resources and closes the window. A
+// window closed already is left alone.
 func (w *Window) Close() {
+	if w.closed {
+		return
+	}
+
+	w.closed = true
+
 	if w.shutdown != nil {
 		w.shutdown()
 		w.shutdown = nil

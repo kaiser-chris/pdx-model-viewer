@@ -52,6 +52,10 @@ type App struct {
 	// texture the interface has already been told to show.
 	viewerSize [2]int32
 
+	// desktopSize is the resolution of the monitor the window opened on,
+	// which the export's sizes are based on.
+	desktopSize [2]int32
+
 	// framed is the box the model on view fits in, and pan how far the point
 	// the camera looks at has been moved away from its middle.
 	framed [2][3]float32
@@ -78,6 +82,20 @@ type App struct {
 	// dialogs asks the user for a file, and dialog is the one open now.
 	dialogs fileDialogs
 	dialog  *pendingDialog
+
+	// The export: its window's choices, the dialog asking where to, the
+	// export to draw next frame, the files being written, and where the last
+	// one went.
+	showExport     bool
+	exportSettings exportSettings
+	exportDialog   *job[*exportRequest]
+	exportPending  *exportRequest
+	exportWriting  *job[string]
+
+	// settings are what is remembered between runs, such as the recent
+	// files, kept in settingsFile.
+	settings     settings
+	settingsFile string
 
 	// input feeds extra input into Dear ImGui each frame, and scale fixes the
 	// interface scale. Only the interface tests set them.
@@ -162,6 +180,7 @@ func New(options Options) (*App, error) {
 	config := configDir(options.ConfigDir)
 	layout := configFile(config, "layout.ini")
 	placementFile := configFile(config, "window.json")
+	settingsFile := configFile(config, "settings.json")
 
 	application := &App{
 		games:        map[string]*workspace.Game{},
@@ -169,6 +188,8 @@ func New(options Options) (*App, error) {
 		showDetails:  true,
 		layoutBuilt:  fileExists(layout),
 		status:       "Open an asset file to view its entities",
+		settings:     loadSettings(settingsFile),
+		settingsFile: settingsFile,
 		scale:        options.Scale,
 	}
 
@@ -195,6 +216,10 @@ func New(options Options) (*App, error) {
 
 	application.window.Place(placement, options.Hidden)
 	application.dialogs = systemDialogs{parent: dialogParent()}
+
+	monitor := rl.GetCurrentMonitor()
+	application.desktopSize = [2]int32{int32(rl.GetMonitorWidth(monitor)), int32(rl.GetMonitorHeight(monitor))}
+	application.exportSettings = newExportSettings(application.desktopSize, application.settings.ExportSize)
 
 	// Everything below needs the OpenGL context the window just created.
 	renderer, err := render.NewRenderer()
@@ -263,6 +288,10 @@ var viewportBackground = rl.Color{R: 0x2B, G: 0x30, B: 0x38, A: 0xFF}
 // drawOffscreen draws the model into the viewport's picture, which the
 // interface shows further down the same frame.
 func (a *App) drawOffscreen() {
+	// An export draws into the viewer's picture at a size of its own, so it
+	// goes first, and the viewport is drawn again after it.
+	a.drawExport()
+
 	if size := a.viewerSize; size[0] > 0 && size[1] > 0 {
 		a.viewer.Resize(size[0], size[1])
 	}
@@ -287,6 +316,7 @@ func (a *App) frame() {
 	a.pollOpening()
 	a.pollLoading()
 	a.pollDroppedFiles()
+	a.pollExport()
 
 	// Checked every frame so that the interface follows the window from one
 	// monitor to another. Nothing happens unless the scale actually changes.
@@ -304,6 +334,7 @@ func (a *App) frame() {
 
 	a.errorPopup()
 	a.aboutPopup()
+	a.exportWindow()
 
 	a.handleShortcuts()
 }
@@ -374,6 +405,7 @@ func (a *App) pollOpening() {
 
 	a.games[opened.location.Key()] = opened.game
 	a.document = opened
+	a.rememberRecentFile(opened.location.File)
 	a.search = ""
 	a.unloadShown()
 

@@ -16,6 +16,9 @@ files open with: associate the extension with `pdx-model-viewer` (on Windows,
 opens with **File → Open...** (`Ctrl+O`) as well, and a file dropped onto the
 window.
 
+**File → Recent** lists the last ten files opened, to open one again, and the
+open dialog starts in the folder of the last one.
+
 The meshes and textures of the file are looked for where the game looks for
 them, from the game the file belongs to, which the viewer works out from
 where the file is:
@@ -83,11 +86,29 @@ coloured by the tint their files name, or a green of leaves where they name
 none.
 
 The viewer opens maximized the first time, and after that the way it was
-closed: maximized or not, and at the size and place it had. The window and
-the layout of the panels are kept in `%AppData%\pdx-model-viewer` on Windows
-and in `~/.config/pdx-model-viewer` on Linux. **View → Reset Layout** puts the
-panels back: the viewport on the left, and on the right the entities above
-the details.
+closed: maximized or not, and at the size and place it had. The window, the
+layout of the panels, the recent files and the export folder are kept in
+`%AppData%\pdx-model-viewer` on Windows and in `~/.config/pdx-model-viewer`
+on Linux. **View → Reset Layout** puts the panels back: the viewport on the
+left, and on the right the entities above the details.
+
+### Exporting
+
+**File → Export...** (`Ctrl+E`) writes the entity on view out as PNG files:
+
+- the views to export: the current view, as the viewport shows it, and the
+  front, back, left and right sides, top and bottom, each of the whole model;
+- a background colour, off to begin with, which leaves the background
+  transparent;
+- the size of the pictures, the desktop's resolution to begin with. **50%**,
+  **Desktop** and **200%** set it from the desktop's resolution; a side can be
+  up to 8192 pixels. The size set last is kept for the next run.
+
+One view is saved where the save dialog says; several go to a folder you
+choose. The dialogs start where the last export went. Either way a file is
+named `<entity>_<view>.png`, such as `statue_entity_front.png`. Where a name
+is taken, a number is added, and the views of one export share it, so that
+they stay one group: `statue_entity_front_1.png`, `statue_entity_back_1.png`.
 
 ### Not supported yet
 

@@ -190,6 +190,14 @@ func (f *fakeDialogs) chooseAssetFile(folder string) (string, error) {
 	return answer, nil
 }
 
+func (f *fakeDialogs) chooseExportFile(proposed string) (string, error) {
+	return f.chooseAssetFile(proposed)
+}
+
+func (f *fakeDialogs) chooseExportFolder(folder string) (string, error) {
+	return f.chooseAssetFile(folder)
+}
+
 func (f *fakeDialogs) asked() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -202,6 +210,14 @@ func (f *fakeDialogs) asked() []string {
 func startApp(t *testing.T) (*App, *uitest.Driver) {
 	t.Helper()
 
+	return startAppIn(t, t.TempDir())
+}
+
+// startAppIn is startApp with the settings kept in a folder of the test's
+// choosing, which a second run started after closing the first reads.
+func startAppIn(t *testing.T, config string) (*App, *uitest.Driver) {
+	t.Helper()
+
 	// raylib and OpenGL belong to the thread that created the window, and a
 	// test runs on a goroutine the scheduler may move between threads.
 	runtime.LockOSThread()
@@ -209,7 +225,7 @@ func startApp(t *testing.T) (*App, *uitest.Driver) {
 
 	// A fixed scale, so that what the tests see does not depend on the
 	// display of the machine running them.
-	application, err := New(Options{ConfigDir: t.TempDir(), Hidden: true, Scale: 1})
+	application, err := New(Options{ConfigDir: config, Hidden: true, Scale: 1})
 	if err != nil {
 		t.Fatalf("start the application: %v", err)
 	}

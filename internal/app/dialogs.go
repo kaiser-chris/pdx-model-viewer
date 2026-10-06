@@ -17,6 +17,11 @@ import (
 // with paths of their own, since a test cannot click through a real one.
 type fileDialogs interface {
 	chooseAssetFile(folder string) (string, error)
+
+	// chooseExportFile asks where to save a picture, proposing a path, and
+	// chooseExportFolder asks for the folder to save several in.
+	chooseExportFile(proposed string) (string, error)
+	chooseExportFolder(folder string) (string, error)
 }
 
 // systemDialogs shows the native dialogs: the common dialogs on Windows, and
@@ -48,6 +53,36 @@ func (d systemDialogs) chooseAssetFile(folder string) (string, error) {
 	return path, err
 }
 
+func (d systemDialogs) chooseExportFile(proposed string) (string, error) {
+	path, err := zenity.SelectFileSave(
+		zenity.Title("Export View"),
+		zenity.Filename(proposed),
+		zenity.ConfirmOverwrite(),
+		zenity.FileFilter{Name: "PNG images", Patterns: []string{"*.png"}, CaseFold: true},
+		d.parent,
+	)
+	if errors.Is(err, zenity.ErrCanceled) {
+		return "", nil
+	}
+
+	return path, err
+}
+
+func (d systemDialogs) chooseExportFolder(folder string) (string, error) {
+	options := []zenity.Option{zenity.Title("Export Views to a Folder"), zenity.Directory(), d.parent}
+
+	if folder != "" {
+		options = append(options, zenity.Filename(folder+string(filepath.Separator)))
+	}
+
+	path, err := zenity.SelectFile(options...)
+	if errors.Is(err, zenity.ErrCanceled) {
+		return "", nil
+	}
+
+	return path, err
+}
+
 // pendingDialog is an open file dialog, answered on a goroutine of its own so
 // that the window keeps drawing meanwhile.
 type pendingDialog = job[string]
@@ -60,11 +95,7 @@ func (a *App) askForAssetFile() {
 		return
 	}
 
-	var folder string
-	if a.document != nil {
-		folder = filepath.Dir(a.document.location.File)
-	}
-
+	folder := a.openFolder()
 	dialogs := a.dialogs
 
 	a.dialog = start(func() (string, error) {

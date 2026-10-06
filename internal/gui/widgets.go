@@ -229,6 +229,14 @@ func InputText(label, hint string, text *string) bool {
 	return changed
 }
 
+// InputInt is a field for a whole number, without the buttons that step it.
+func InputInt(label string, value *int32) bool {
+	changed := imgui.InputIntV(fieldLabel(label), value, 0, 0, 0)
+	record(label, false)
+
+	return changed
+}
+
 // labelColumn is how far in from the left the fields of a form start, in the
 // units the interface was designed in. Labels longer than that push their own
 // field further right.

@@ -189,7 +189,7 @@ func centeredMessage(origin, size imgui.Vec2, title, detail string) {
 	imgui.PushTextWrapPosV(imgui.CursorPosX() + width)
 
 	gui.PushStrongFont()
-	imgui.TextWrapped(title)
+	gui.TextWrapped(title)
 	gui.Record(title)
 	gui.PopFont()
 
@@ -242,17 +242,17 @@ func (a *App) entitiesBody() {
 	}
 
 	gui.PushStrongFont()
-	imgui.TextWrapped(filepath.Base(document.location.File))
+	gui.TextWrapped(filepath.Base(document.location.File))
 	gui.PopFont()
-	imgui.SetItemTooltip(document.location.File)
+	gui.Tooltip(document.location.File)
 
-	imgui.TextDisabled(document.game.Name)
+	gui.TextDisabled(document.game.Name)
 	gui.Record(document.game.Name)
-	imgui.SetItemTooltip(document.location.Root)
+	gui.Tooltip(document.location.Root)
 
 	if document.game.Loose() {
 		gui.DimmedText(looseNote)
-		imgui.SetItemTooltip("The meshes and textures are looked for around the file and by their names next to it. A missing texture shows as a checkerboard, a missing mesh as nothing.")
+		gui.Tooltip("The meshes and textures are looked for around the file and by their names next to it. A missing texture shows as a checkerboard, a missing mesh as nothing.")
 	}
 
 	for _, problem := range document.listing.Diagnostics {
@@ -276,9 +276,9 @@ func (a *App) entitiesBody() {
 	shown := matching(entities, a.search)
 
 	if len(shown) == len(entities) {
-		imgui.TextDisabled(plural(len(entities), "entity", "entities"))
+		gui.TextDisabled(plural(len(entities), "entity", "entities"))
 	} else {
-		imgui.TextDisabled(fmt.Sprintf("%d of %s", len(shown), plural(len(entities), "entity", "entities")))
+		gui.TextDisabled(fmt.Sprintf("%d of %s", len(shown), plural(len(entities), "entity", "entities")))
 	}
 
 	if gui.BeginList("##entities") {
@@ -350,7 +350,7 @@ func (a *App) noEntities(document *document) {
 	gui.DimmedText("It defines these meshes, which entities in other files draw:")
 
 	for _, mesh := range meshes {
-		imgui.BulletText(mesh)
+		gui.BulletText(mesh)
 		gui.Record(mesh)
 	}
 }
@@ -454,9 +454,9 @@ func beginPropertyTable(id string) bool {
 func propertyRow(name, value string) {
 	imgui.TableNextRow()
 	imgui.TableNextColumn()
-	imgui.TextDisabled(name)
+	gui.TextDisabled(name)
 	imgui.TableNextColumn()
-	imgui.TextWrapped(value)
+	gui.TextWrapped(value)
 	gui.Record(value)
 }
 
@@ -500,7 +500,7 @@ func (a *App) partsTable() {
 		imgui.TextUnformatted(name)
 		gui.PopFont()
 		gui.Record(name)
-		imgui.SetItemTooltip(partTooltip(part))
+		gui.Tooltip(partTooltip(part))
 
 		gui.DimmedText(partLook(part))
 
@@ -513,7 +513,7 @@ func (a *App) partsTable() {
 		imgui.TableNextColumn()
 		imgui.Dummy(imgui.Vec2{Y: padding})
 		rightAligned(thousands(part.Triangles), false)
-		imgui.SetItemTooltip(plural(part.Vertices, "vertex", "vertices"))
+		gui.Tooltip(plural(part.Vertices, "vertex", "vertices"))
 		rightAligned("triangles", true)
 	}
 
@@ -546,12 +546,12 @@ func textureMaps(part workspace.PartDetails) {
 		}
 
 		if texture.found {
-			imgui.TextDisabled(texture.name)
-			imgui.SetItemTooltip("The " + strings.ToLower(texture.name) + " map was found")
+			gui.TextDisabled(texture.name)
+			gui.Tooltip("The " + strings.ToLower(texture.name) + " map was found")
 		} else {
 			label := "No " + strings.ToLower(texture.name)
 			gui.WarningText(label)
-			imgui.SetItemTooltip("The " + strings.ToLower(texture.name) + " map was not found; drawn with a stand in")
+			gui.Tooltip("The " + strings.ToLower(texture.name) + " map was not found; drawn with a stand in")
 		}
 	}
 }
@@ -561,7 +561,7 @@ func rightAligned(text string, dimmed bool) {
 	imgui.SetCursorPosX(imgui.CursorPosX() + imgui.ContentRegionAvail().X - imgui.CalcTextSize(text).X)
 
 	if dimmed {
-		imgui.TextDisabled(text)
+		gui.TextDisabled(text)
 	} else {
 		imgui.TextUnformatted(text)
 	}
@@ -581,8 +581,8 @@ func problemText(problem report.Diagnostic) {
 			place += fmt.Sprintf(":%d", problem.Line)
 		}
 
-		imgui.TextDisabled(place)
-		imgui.SetItemTooltip(problem.Path)
+		gui.TextDisabled(place)
+		gui.Tooltip(problem.Path)
 	}
 
 	imgui.Spacing()
@@ -602,7 +602,7 @@ func (a *App) displaySettings() {
 
 		look := &a.viewer.Look
 
-		imgui.TextDisabled(label)
+		gui.TextDisabled(label)
 		gui.Record(label)
 		imgui.SameLine()
 		imgui.SetNextItemWidth(fullWidth)
@@ -611,7 +611,7 @@ func (a *App) displaySettings() {
 			a.paletteChosen = true
 		}
 
-		imgui.SetItemTooltip("Blended into the parts drawn as skin, where the alpha of their diffuse map says")
+		gui.Tooltip("Blended into the parts drawn as skin, where the alpha of their diffuse map says")
 	}
 
 	gui.Checkbox("Turn automatically", &a.turning)
