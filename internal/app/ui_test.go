@@ -21,6 +21,7 @@ import (
 // scrolls in a child window of the panel, named after it.
 const (
 	windowEntityList = panelEntities + "/"
+	windowList       = panelDetails + "/"
 )
 
 func TestStartsEmpty(t *testing.T) {

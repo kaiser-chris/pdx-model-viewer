@@ -315,6 +315,10 @@ func (d *Driver) ClickItem(item Item) {
 // maxAimFrames bounds how long aim follows a moving widget.
 const maxAimFrames = 8
 
+// maxScrollWindows is how many windows deep a widget is scrolled for: the
+// window it is in, and the windows that hold that one.
+const maxScrollWindows = 4
+
 // aim puts the pointer on a widget and keeps it there until the widget stops
 // moving, then returns where the pointer ended up.
 //
@@ -550,10 +554,14 @@ func (d *Driver) ClickAt(point imgui.Vec2) {
 	d.Frame()
 }
 
-// scrollIntoView scrolls the window a widget is in until the widget is in
-// the middle of what the window shows, the way a user scrolls to a button
+// scrollIntoView scrolls the windows a widget is in until the widget is in
+// the middle of what its window shows, the way a user scrolls to a button
 // before clicking it. Only up and down: nothing in the application scrolls
 // sideways, and a widget off the side stays off it, for aim to report.
+//
+// A widget in a list of its own is clipped by the panel the list sits in as
+// well as by the list, and the list cannot bring it back on its own, so the
+// windows around it are scrolled in turn.
 func (d *Driver) scrollIntoView(item Item) Item {
 	low, high := item.visible()
 	if low.Y < high.Y && item.Reachable(item.ClickPoint()) {
@@ -565,6 +573,29 @@ func (d *Driver) scrollIntoView(item Item) Item {
 		return item
 	}
 
+	// A panel several windows deep is scrolled one window at a time, from the
+	// innermost out, since scrolling one of them moves what is inside it.
+	for range maxScrollWindows {
+		item = d.scrollWindow(item, window)
+
+		if item.Reachable(item.ClickPoint()) {
+			break
+		}
+
+		parent := window.ParentWindow()
+		if parent == nil || parent.CData == nil {
+			break
+		}
+
+		window = parent
+	}
+
+	return item
+}
+
+// scrollWindow scrolls one window so that a widget's middle is the middle of
+// what that window shows, and returns the widget as it is laid out after.
+func (d *Driver) scrollWindow(item Item, window *imgui.Window) Item {
 	middle := (item.Min.Y + item.Max.Y) / 2
 	shown := (item.ClipMin.Y + item.ClipMax.Y) / 2
 

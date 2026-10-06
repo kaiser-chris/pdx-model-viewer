@@ -185,9 +185,13 @@ entity = {
 
 	// The variation of the fixture belt: two whole ways of patterning it and
 	// two of colouring it, which is what the viewer offers to pick between.
+	// The patterns are named as the games name theirs, which for one of them
+	// is three names long: what a pattern is described by is the textures it
+	// draws with, one for each channel of the mask it is not the same for.
 	beltVariation = `
-pattern_textures = { name = "silk" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
-pattern_textures = { name = "trim" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_textures = { name = "generic_cotton_standard_fine_01" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_textures = { name = "generic_silk_fine_plain_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_textures = { name = "european_wool_standard_striped_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
 pattern_layout = { name = "plain_layout" scale = 1 rotation = 0 offset = { x = 0 y = 0 } }
 
 variation = {
@@ -195,18 +199,18 @@ variation = {
 
 	pattern = {
 		weight = 1
-		r = { textures = "silk" layout = "plain_layout" }
-		g = { textures = "silk" layout = "plain_layout" }
-		b = { textures = "silk" layout = "plain_layout" }
-		a = { textures = "silk" layout = "plain_layout" }
+		r = { textures = "generic_cotton_standard_fine_01" layout = "plain_layout" }
+		g = { textures = "generic_silk_fine_plain_02" layout = "plain_layout" }
+		b = { textures = "european_wool_standard_striped_02" layout = "plain_layout" }
+		a = { textures = "generic_cotton_standard_fine_01" layout = "plain_layout" }
 	}
 
 	pattern = {
 		weight = 1
-		r = { textures = "trim" layout = "plain_layout" }
-		g = { textures = "trim" layout = "plain_layout" }
-		b = { textures = "trim" layout = "plain_layout" }
-		a = { textures = "trim" layout = "plain_layout" }
+		r = { textures = "generic_silk_fine_plain_02" layout = "plain_layout" }
+		g = { textures = "generic_silk_fine_plain_02" layout = "plain_layout" }
+		b = { textures = "generic_silk_fine_plain_02" layout = "plain_layout" }
+		a = { textures = "generic_silk_fine_plain_02" layout = "plain_layout" }
 	}
 
 	color_palette = { weight = 1 texture = "gfx/portraits/accessory_variations/textures/fixture_red.png" }

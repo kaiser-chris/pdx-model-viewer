@@ -167,11 +167,28 @@ const listRowGap = 2
 // background of its own with room around the rows. It is ended with EndList,
 // whatever it returns.
 func BeginList(id string) bool {
+	return beginList(id, 0)
+}
+
+// BeginListRows starts a list as BeginList does, as tall as the number of rows
+// it is given, which is what a list of a few choices inside a panel needs: one
+// that filled the space left would take the panel for itself.
+func BeginListRows(id string, rows int) bool {
+	return beginList(id, listHeight(rows))
+}
+
+// listHeight is how tall a list of a number of rows is: the rows themselves,
+// the room between them, and the room the list leaves around them.
+func listHeight(rows int) float32 {
+	return 2*ListPadding() + float32(rows)*ListRowPitch() - Scaled(listRowGap)
+}
+
+func beginList(id string, height float32) bool {
 	imgui.PushStyleColorVec4(imgui.ColChildBg, *imgui.StyleColorVec4(imgui.ColFrameBg))
 	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, ScaledVec2(listPadding.X, listPadding.Y))
 	imgui.PushStyleVarFloat(imgui.StyleVarChildRounding, imgui.CurrentStyle().FrameRounding())
 
-	open := imgui.BeginChildStrV(id, imgui.Vec2{}, imgui.ChildFlagsAlwaysUseWindowPadding, 0)
+	open := imgui.BeginChildStrV(id, imgui.Vec2{Y: height}, imgui.ChildFlagsAlwaysUseWindowPadding, 0)
 
 	imgui.PopStyleVarV(2)
 	imgui.PopStyleColor()
@@ -190,9 +207,12 @@ func EndList() {
 // ListRow is a row of a list that can be picked, as wide as the list, with
 // room around its text. It reports whether it was clicked.
 //
-// A label may carry an id after "##", as any widget's may. The row draws the
-// part before it, and is looked up by the whole of it, so that two rows of the
-// same name in one list can be told apart.
+// A label that is wider than the row is cut short and ended in three dots, so
+// that a name too long for its place says that it is longer rather than
+// stopping in the middle of a word. A label may carry an id after "##", as any
+// widget's may: the row draws the part before it, and is looked up by the
+// whole of it, so that two rows of the same name in one list can be told
+// apart.
 func ListRow(label string, selected bool) bool {
 	padding := ScaledVec2(listRowPadding.X, listRowPadding.Y)
 
@@ -214,10 +234,47 @@ func ListRow(label string, selected bool) bool {
 	}
 
 	origin := imgui.ItemRectMin()
+	room := imgui.ItemRectMax().X - origin.X - 2*padding.X
+
 	imgui.WindowDrawList().AddTextVec2(imgui.Vec2{X: origin.X + padding.X, Y: origin.Y + padding.Y},
-		imgui.ColorU32Col(imgui.ColText), visible)
+		imgui.ColorU32Col(imgui.ColText), fitted(visible, room))
 
 	return clicked
+}
+
+// cut is what a label too long for its row ends in.
+const cut = "..."
+
+// fitted is a text as much of which as fits a width, ended in dots when it was
+// cut short.
+func fitted(text string, room float32) string {
+	return fittedBy(text, room, func(text string) float32 { return imgui.CalcTextSize(text).X })
+}
+
+// fittedBy is fitted, measuring with the width it is given rather than with a
+// font, which is what lets the fitting be checked without one.
+func fittedBy(text string, room float32, width func(string) float32) string {
+	if room <= 0 || width(text) <= room {
+		return text
+	}
+
+	runes := []rune(text)
+
+	// The longest beginning that fits with the dots on the end, found by
+	// halving rather than by trying every one of them.
+	low, high := 0, len(runes)
+
+	for low < high {
+		middle := (low + high + 1) / 2
+
+		if width(string(runes[:middle])+cut) <= room {
+			low = middle
+		} else {
+			high = middle - 1
+		}
+	}
+
+	return string(runes[:low]) + cut
 }
 
 // ListPadding is the room a list leaves above and below its rows.
