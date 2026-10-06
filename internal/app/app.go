@@ -338,14 +338,19 @@ func (a *App) Open(file string) {
 
 	// The game is looked up here rather than in the job, since the jobs must
 	// not touch the application's state.
-	known := a.games[location.Root]
+	known := a.games[location.Key()]
 	picked, wasPicked := a.environments[location.Root]
 
 	a.opening = start(func() (*document, error) {
 		opened := &document{location: location, listing: workspace.List(location), game: known}
 
 		if opened.game == nil {
-			game, err := workspace.OpenGame(location.Root)
+			open := func() (*workspace.Game, error) { return workspace.OpenGame(location.Root) }
+			if location.Loose {
+				open = func() (*workspace.Game, error) { return workspace.OpenLoose(location) }
+			}
+
+			game, err := open()
 			if err != nil {
 				return nil, err
 			}
@@ -397,7 +402,7 @@ func (a *App) pollOpening() {
 		return
 	}
 
-	a.games[opened.location.Root] = opened.game
+	a.games[opened.location.Key()] = opened.game
 	a.document = opened
 	a.search = ""
 	a.unloadShown()
@@ -484,7 +489,7 @@ func (a *App) reload() {
 		return
 	}
 
-	delete(a.games, a.document.location.Root)
+	delete(a.games, a.document.location.Key())
 
 	// The entity picked is picked again once the file is open, if it is still
 	// there.

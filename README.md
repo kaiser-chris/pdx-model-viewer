@@ -27,9 +27,21 @@ where the file is:
 - a DLC, below the game's `dlc` folder, belongs to the game, so that what it
   uses from the game is found as well.
 
-A file has to be inside the `gfx` folder of a game or mod. A mod that draws
-meshes or textures of the game it changes is not supported yet: it is read on
-its own.
+A mod that draws meshes or textures of the game it changes is not supported
+yet: it is read on its own.
+
+A file outside the `gfx` folder of any game or mod, such as one kept on its own
+with its meshes and textures, is drawn as well as it can be, on its own:
+
+- the meshes and textures it names are looked for where it says, relative to
+  its folder, and by their file names next to it, so a file taken out of a
+  game with the files it uses works;
+- a texture of colour that is not there shows as a magenta and black
+  checkerboard, a missing normal or properties map is left out, and a missing
+  mesh, or one defined in another asset file, shows as nothing;
+- without the game's shaders, the parts are drawn with the viewer's own, which
+  tells from the name of each part's shader whether it is skin, a decal laid
+  over the rest, or leaves and hair cut out by their alpha.
 
 The game's asset definitions are read once, which takes under a second, and
 kept while the viewer runs, so the next file of the same game opens at once.

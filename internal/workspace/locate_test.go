@@ -127,13 +127,11 @@ func TestLocate(t *testing.T) {
 func TestLocateRefuses(t *testing.T) {
 	dir := t.TempDir()
 	tree(t, dir, map[string]string{
-		"loose/statue.asset":            "",
 		"game/gfx/models/statue.txt":    "",
 		"game/gfx/models/folder.asset/": "",
 	})
 
 	for name, path := range map[string]string{
-		"outside of gfx": "loose/statue.asset",
 		"another kind":   "game/gfx/models/statue.txt",
 		"a folder":       "game/gfx/models/folder.asset",
 		"a missing file": "game/gfx/models/missing.asset",
@@ -155,5 +153,29 @@ func TestSourceName(t *testing.T) {
 		if got := SourceName(root); got != want {
 			t.Errorf("SourceName(%s) = %s, want %s", root, got, want)
 		}
+	}
+}
+
+// A file in no gfx folder is a loose file: its folder stands in for the
+// root, and it is kept by itself rather than by its folder.
+func TestLocateLoose(t *testing.T) {
+	dir := t.TempDir()
+	tree(t, dir, map[string]string{"my_models/statue.asset": ""})
+
+	location, err := Locate(filepath.Join(dir, "my_models", "statue.asset"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !location.Loose || location.Root != filepath.Join(dir, "my_models") || location.Relative != "statue.asset" {
+		t.Errorf("location = %+v, want the loose file in its folder", location)
+	}
+
+	if location.Key() != location.File {
+		t.Errorf("key = %s, want the file", location.Key())
+	}
+
+	if game := (Location{Root: dir, File: filepath.Join(dir, "a.asset")}); game.Key() != dir {
+		t.Errorf("key of a game's file = %s, want its root", game.Key())
 	}
 }

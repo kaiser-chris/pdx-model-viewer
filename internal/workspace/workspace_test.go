@@ -316,3 +316,51 @@ func TestBuiltInEnvironment(t *testing.T) {
 		t.Errorf("environment map = %+v, want the built in one", lighting.Map)
 	}
 }
+
+// A loose file is read on its own, with what is around it: its entities
+// load, one of a missing mesh as nothing, and it has no shaders or
+// environments of a game, only the built in light.
+func TestOpenLoose(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "my_models")
+	tree(t, dir, map[string]string{
+		"statue.asset": statueMeshAsset + statueEntityAsset,
+		"statue.mesh":  string(meshtest.QuadFile(2, 2)),
+	})
+
+	location, err := Locate(filepath.Join(dir, "statue.asset"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	game, err := OpenLoose(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !game.Loose() || game.ShaderSource(location) != nil || game.Environments(location) != nil {
+		t.Error("a loose file has a game's shaders or environments")
+	}
+
+	lighting, err := game.Lighting(location, "gfx/map/environment/environment.txt")
+	if err != nil || lighting.Map == nil || lighting.Environment == nil {
+		t.Errorf("lighting = %+v, %v; want the built in one", lighting, err)
+	}
+
+	statue, err := game.Load("statue_entity")
+	if err != nil || len(statue.Model.Parts) != 1 {
+		t.Fatalf("statue = %+v, %v", statue, err)
+	}
+
+	// The textures it names are not there: the diffuse map shows as the
+	// checkerboard, the normal map is left out.
+	if textures := statue.Model.Parts[0].Textures; textures.Diffuse == nil || textures.Normal != nil {
+		t.Errorf("textures = %+v, want the checkerboard for the diffuse map alone", textures)
+	}
+
+	// One whose mesh the file does not define, as a mesh defined in another
+	// file, which is not read with it, is drawn as nothing.
+	missing, err := game.Load("Another_entity")
+	if err != nil || len(missing.Model.Parts) != 0 || len(missing.Diagnostics) == 0 {
+		t.Errorf("entity of a mesh no file defines = %+v, %v; want nothing, reported", missing, err)
+	}
+}

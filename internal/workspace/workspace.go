@@ -91,6 +91,7 @@ type Game struct {
 	// Took is how long reading the definitions took.
 	Took time.Duration
 
+	// set is the game's folders, which a loose file has none of.
 	set    *folders.Set
 	assets *asset.Assets
 
@@ -131,9 +132,54 @@ func OpenGame(root string) (*Game, error) {
 	return game, nil
 }
 
+// OpenLoose reads a loose asset file, one of no game, on its own: the
+// entities it defines are drawn with what is around it. The files they name
+// are looked for where the file says, and by their names next to it; a
+// texture of colour that is not there anyway shows as a checkerboard, a mesh
+// that is not there as nothing. Without the games' shaders, the parts are
+// drawn with the viewer's own.
+func OpenLoose(location Location) (*Game, error) {
+	start := time.Now()
+	name := SourceName(location.Root)
+
+	file := folders.File{Relative: location.Relative, Path: location.File, Source: name}
+
+	syntax := &report.Collector{}
+	parsed := database.ParseFiles([]folders.File{file}, syntax)
+	if len(parsed) == 0 {
+		return nil, fmt.Errorf("%s could not be read", location.File)
+	}
+
+	assets := asset.Read(parsed[0].Document, file, syntax)
+
+	loader := entity.NewLoader(entity.Folder{Path: location.Root, Name: name}, assets)
+	loader.MissingTexture = texture.Checkerboard()
+	loader.EmptyWithoutMesh = true
+	loader.ByName = true
+
+	return &Game{
+		Root:        location.Root,
+		Name:        name,
+		Diagnostics: syntax.Diagnostics,
+		Took:        time.Since(start),
+		assets:      assets,
+		loader:      loader,
+	}, nil
+}
+
+// Loose reports whether the game is a loose file's, of no game.
+func (g *Game) Loose() bool {
+	return g.set == nil
+}
+
 // ShaderSource reads the shader files the entities of an asset file are drawn
-// with: those of the layer the file is in, in a game split into layers.
+// with: those of the layer the file is in, in a game split into layers. A
+// loose file has none, and is drawn with the viewer's own shader.
 func (g *Game) ShaderSource(location Location) shader.Source {
+	if g.set == nil {
+		return nil
+	}
+
 	layer, _, found := strings.Cut(location.Relative, "/")
 	if !found || !slices.Contains(g.set.Layers(), layer) {
 		layer = ""
@@ -158,6 +204,10 @@ const BuiltIn = ""
 // the game's own environment file is in, that game's own first. A game with
 // none has none; its entities are lit by the built in environment.
 func (g *Game) Environments(location Location) []string {
+	if g.set == nil {
+		return nil
+	}
+
 	source := g.ShaderSource(location)
 	configured := environment.ConfiguredPath(source)
 
@@ -202,7 +252,7 @@ func (g *Game) Environments(location Location) []string {
 // library's own. Without the file it is the library's defaults, and when its
 // map cannot be read the library's, and the error says why.
 func (g *Game) Lighting(location Location, file string) (*Lighting, error) {
-	if file == BuiltIn {
+	if file == BuiltIn || g.set == nil {
 		return &Lighting{Environment: environment.Default(), Map: environment.DefaultCube()}, nil
 	}
 

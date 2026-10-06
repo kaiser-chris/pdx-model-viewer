@@ -250,6 +250,11 @@ func (a *App) entitiesBody() {
 	gui.Record(document.game.Name)
 	imgui.SetItemTooltip(document.location.Root)
 
+	if document.game.Loose() {
+		gui.DimmedText(looseNote)
+		imgui.SetItemTooltip("The meshes and textures are looked for around the file and by their names next to it. A missing texture shows as a checkerboard, a missing mesh as nothing.")
+	}
+
 	for _, problem := range document.listing.Diagnostics {
 		gui.WarningText(fmt.Sprintf("Line %d: %s", problem.Line, problem.Message))
 	}
@@ -639,6 +644,9 @@ func (a *App) environmentChoice() {
 
 // builtInEnvironment is how the built in environment is listed.
 const builtInEnvironment = "Built in"
+
+// looseNote says what a loose file, one of no game, is drawn with.
+const looseNote = "Outside any game: drawn with the viewer's own shader."
 
 // colorVec4 turns a raylib colour into a Dear ImGui one.
 func colorVec4(color rl.Color) imgui.Vec4 {

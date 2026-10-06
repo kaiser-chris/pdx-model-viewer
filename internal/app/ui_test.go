@@ -194,24 +194,47 @@ func TestMissingTexturesAreReported(t *testing.T) {
 	}
 }
 
-func TestFileOutsideAGameIsRefused(t *testing.T) {
+// A file outside any game is drawn with what is around it: its mesh found
+// by its name next to it, its missing diffuse map shown as the checkerboard
+// of a missing texture, with the viewer's own shader.
+func TestFileOutsideAGameIsDrawn(t *testing.T) {
 	application, driver := startApp(t)
 
-	application.Open(filepath.Join(filepath.Dir(fixtureGame(t)), "loose", "outside.asset"))
-	driver.Frames(3)
+	openFile(t, application, driver, filepath.Join(filepath.Dir(fixtureGame(t)), "loose", "outside.asset"))
+	waitForEntity(application, driver, "outside_entity")
 
-	if !driver.Exists(popupError, "OK") {
-		t.Fatal("no popup says why the file could not be opened")
+	if application.openError != "" || !application.document.location.Loose {
+		t.Fatalf("opened %+v, error %q; want the loose file", application.document.location, application.openError)
 	}
 
-	driver.Click(popupError, "OK")
-
-	if driver.Exists(popupError, "OK") || application.openError != "" {
-		t.Error("the popup did not close")
+	if application.shaderSource != nil {
+		t.Error("the loose file is drawn with a game's shaders")
 	}
 
-	if application.document != nil {
-		t.Error("the refused file was opened all the same")
+	if !driver.Exists(panelEntities, looseNote) {
+		t.Error("nothing says the file is outside any game")
+	}
+
+	// Magenta or black, wherever the centre falls on the checkerboard.
+	picture := application.viewer.Image()
+	magenta, black := 0, 0
+
+	for y := 0; y < picture.Bounds().Dy(); y += 4 {
+		for x := 0; x < picture.Bounds().Dx(); x += 4 {
+			pixel := picture.RGBAAt(x, y)
+
+			switch {
+			case pixel.A == 0:
+			case int(pixel.R) > 2*int(pixel.G)+20 && int(pixel.B) > 2*int(pixel.G)+20:
+				magenta++
+			case pixel.R < 30 && pixel.G < 30 && pixel.B < 30:
+				black++
+			}
+		}
+	}
+
+	if magenta < 20 || black < 20 {
+		t.Errorf("magenta %d, black %d pixels; want the checkerboard", magenta, black)
 	}
 }
 

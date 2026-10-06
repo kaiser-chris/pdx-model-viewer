@@ -78,6 +78,22 @@ var (
 	fixtureProperties = color.NRGBA{R: 0, G: 64, B: 0, A: 255}
 )
 
+// outsideAsset is an asset file kept outside the game, with its mesh next
+// to it, named by the path it has in the game, and its diffuse map missing.
+const outsideAsset = `
+pdxmesh = {
+	name = "outside_mesh"
+	file = "gfx/models/outside/outside.mesh"
+	meshsettings = {
+		name = "quadShape"
+		index = 0
+		texture_diffuse = "outside_diffuse.dds"
+		shader = "standard"
+	}
+}
+entity = { name = "outside_entity" pdxmesh = "outside_mesh" }
+`
+
 // fixture is the game, written once for every test of the package, which
 // only reads it.
 var fixture struct {
@@ -110,7 +126,8 @@ func fixtureGame(t *testing.T) string {
 			statue + "statue_properties.png": solid(t, fixtureProperties),
 			statue + "pedestal.asset":        []byte(pedestalAsset),
 			statue + "meshes.asset":          []byte(meshesAsset),
-			"../loose/outside.asset":         []byte(pedestalAsset),
+			"../loose/outside.asset":         []byte(outsideAsset),
+			"../loose/outside.mesh":          meshtest.QuadFile(2, 2),
 
 			// Two environments to light the statue with, and a file of the
 			// same folder that is none.

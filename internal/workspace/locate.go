@@ -6,10 +6,14 @@
 // usually by the file association, and works out the game from where that
 // file is: the folder above the gfx folder the file is in is the root of the
 // game or mod, and every file the entities name is looked for from there.
+//
+// A file in no gfx folder, such as one a modder keeps on its own, is read as
+// a loose file: its folder stands in for the root, the files it names are
+// looked for around it and by their names next to it, and what is missing is
+// drawn as well as it can be.
 package workspace
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,7 +49,21 @@ type Location struct {
 
 	// Root is the folder the game's files are read from: the game folder of
 	// an installation, which brings its DLCs with it, or the root of a mod.
+	// For a loose file it is the file's folder.
 	Root string
+
+	// Loose is set for a file in no gfx folder, which belongs to no game.
+	Loose bool
+}
+
+// Key is what what is read for a file is kept by: its game's root, or for a
+// loose file the file itself, since a loose file is read on its own.
+func (l Location) Key() string {
+	if l.Loose {
+		return l.File
+	}
+
+	return l.Root
 }
 
 // Locate works out the game or mod an asset file belongs to.
@@ -79,7 +97,7 @@ func Locate(file string) (Location, error) {
 
 	gfx, ok := enclosingGfx(absolute)
 	if !ok {
-		return Location{}, errors.New(filepath.Base(absolute) + " is not inside the gfx folder of a game or mod, so there is nowhere to look for its meshes and textures")
+		return Location{File: absolute, Relative: filepath.Base(absolute), Root: filepath.Dir(absolute), Loose: true}, nil
 	}
 
 	// The root of the game, DLC or mod the file itself is in.
