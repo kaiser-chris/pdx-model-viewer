@@ -4,13 +4,11 @@ package app
 
 import (
 	"testing"
-
-	"github.com/kaiser-chris/pdx-model-viewer/internal/uitest"
 )
 
 // A model whose entity names a portrait accessory lists it in the details,
-// with the variation it is drawn with and the pattern and the colour palette
-// of it: the two of each are what there is to choose between.
+// headed by the variation it is drawn with, with the patterns and the colour
+// palettes of that variation listed to pick from.
 func TestShowsTheAccessoriesOfAModel(t *testing.T) {
 	application, driver := startApp(t)
 
@@ -19,10 +17,13 @@ func TestShowsTheAccessoriesOfAModel(t *testing.T) {
 
 	for _, shown := range []string{
 		"Accessories (1)",
-		"belt_entity",
 		"fixture_belt",
-		"Pattern##accessory0",
-		"Palette##accessory0",
+		"Patterns",
+		"silk##pattern0",
+		"trim##pattern0",
+		"Palettes",
+		"fixture_red.png##palette0",
+		"fixture_blue.png##palette0",
 	} {
 		if !driver.Exists(panelDetails, shown) {
 			t.Errorf("the details do not show %q", shown)
@@ -66,9 +67,8 @@ func TestPicksAnotherAccessoryAlternative(t *testing.T) {
 		t.Fatalf("the accessory is drawn with pattern %d and palette %d, want the first of each", pattern, palette)
 	}
 
-	// The second palette is blue.
-	driver.Click(panelDetails, "Palette##accessory0")
-	driver.Click(uitest.AnyCombo, "fixture_blue.png##Palette0-1")
+	// The second palette is blue, and picking it from the list draws it.
+	driver.Click(panelDetails, "fixture_blue.png##palette0")
 
 	if _, palette := accessory(); palette != 1 {
 		t.Errorf("the palette picked is %d, want the second", palette)
@@ -82,8 +82,7 @@ func TestPicksAnotherAccessoryAlternative(t *testing.T) {
 
 	// The second pattern draws the same colour: what tells them apart in the
 	// fixture is which of the two it is, not what it looks like.
-	driver.Click(panelDetails, "Pattern##accessory0")
-	driver.Click(uitest.AnyCombo, "trim##Pattern0-1")
+	driver.Click(panelDetails, "trim##pattern0")
 
 	if pattern, _ := accessory(); pattern != 1 {
 		t.Errorf("the pattern picked is %d, want the second", pattern)

@@ -515,80 +515,87 @@ const (
 // says, since the game would not colour that part either.
 const textAccessoryNotDrawn = "The effect of this part lays no pattern, so the game does not draw the accessory either."
 
-// accessoriesBody lists the portrait accessories the model is coloured with:
-// each entity that carries one, with the variation it names and the pattern
-// and the colour palette it is drawn with.
+// accessoriesBody lists what colours the parts of the model: every entity
+// that carries a portrait accessory, headed by the variation it names, with
+// the patterns and the colour palettes that variation offers to draw it with.
 //
 // The games pick one pattern and one palette of a variation at random for
 // every portrait they draw, so where a variation offers more than one of
-// either, which is drawn is the user's to pick. An accessory of one pattern
-// and one palette has nothing to choose, and is only listed.
+// either, which is drawn is the user's to pick, from a list of the
+// alternatives the way a file's entities are listed. A variation that offers
+// one of either has nothing to choose, and is only named.
 func (a *App) accessoriesBody(details workspace.Details, choices []render.AccessoryChoice) {
 	for index, choice := range choices {
 		if index > 0 {
 			imgui.Spacing()
 		}
 
-		label := attachmentLabel(details, choice.Attachment)
-		gui.TextWrapped(label)
-		gui.Record(label)
+		a.accessoryVariation(details, choice)
 
 		if !choice.Drawn {
 			gui.DimmedText(textAccessoryNotDrawn)
 		}
 
-		if !beginPropertyTable(fmt.Sprintf("##accessory%d", index)) {
-			continue
-		}
-
-		propertyRow("Variation", choice.Variation)
-		a.accessoryChoices(index, choice, "Pattern", choice.PatternNames, choice.Pattern, func(at int) {
+		a.accessoryAlternatives(index, "pattern", "Patterns", "Pattern", choice.PatternNames, choice.Pattern, func(at int) {
 			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, at, choice.Palette)
 		})
-		a.accessoryChoices(index, choice, "Palette", choice.PaletteNames, choice.Palette, func(at int) {
+
+		a.accessoryAlternatives(index, "palette", "Palettes", "Palette", choice.PaletteNames, choice.Palette, func(at int) {
 			a.shown.model.ChooseAccessory(choice.Entity, choice.Attachment, choice.Pattern, at)
 		})
-
-		imgui.EndTable()
 	}
 }
 
-// accessoryChoices writes one row of an accessory: what it is drawn with, and
-// where the variation offers more than one, a drop down to pick another.
-func (a *App) accessoryChoices(index int, choice render.AccessoryChoice, name string, alternatives []string, chosen int, pick func(at int)) {
-	if len(alternatives) == 0 {
+// accessoryVariation heads one accessory with the variation that colours it,
+// which is what the patterns and the palettes below it belong to. An accessory
+// an entity attached to the model carries rather than the model's own says so,
+// since the entity on view is the one the details are of.
+func (a *App) accessoryVariation(details workspace.Details, choice render.AccessoryChoice) {
+	gui.PushStrongFont()
+	gui.TextWrapped(choice.Variation)
+	gui.PopFont()
+
+	// Drawn without a widget of its own, so the tests are told of it.
+	gui.Record(choice.Variation)
+
+	if choice.Attachment > 0 {
+		gui.DimmedText("on " + attachmentLabel(details, choice.Attachment))
+	}
+}
+
+// accessoryAlternatives lists what a variation offers to draw an accessory
+// with, the patterns or the palettes: one of them is picked from a list where
+// there is more than one to choose between, and a single one is named, there
+// being nothing to pick.
+//
+// The rows are the panel's own rather than a list of their own, so that they
+// scroll with the rest of the details: a list of their own would be clipped to
+// whatever room is left below, which is nothing in a panel this long. Each row
+// carries the accessory it belongs to, since two accessories can name the same
+// pattern or the same palette.
+func (a *App) accessoryAlternatives(index int, kind, many, one string, alternatives []string, chosen int, pick func(at int)) {
+	switch len(alternatives) {
+	case 0:
+		return
+	case 1:
+		imgui.Spacing()
+		gui.DimmedText(one)
+		gui.TextWrapped(alternatives[0])
+		gui.Record(alternatives[0])
+
 		return
 	}
 
-	imgui.TableNextRow()
-	imgui.TableNextColumn()
-	gui.TextDisabled(name)
-	imgui.TableNextColumn()
-
-	if len(alternatives) == 1 {
-		propertyValue(alternatives[0])
-
-		return
-	}
-
-	if !gui.BeginCombo(fmt.Sprintf("%s##accessory%d", name, index), alternatives[chosen]) {
-		return
-	}
+	imgui.Spacing()
+	gui.DimmedText(many)
 
 	for at, alternative := range alternatives {
-		if gui.ComboItem(fmt.Sprintf("%s##%s%d-%d", alternative, name, index, at), at == chosen) {
+		selected := at == chosen
+
+		if gui.ListRow(fmt.Sprintf("%s##%s%d", alternative, kind, index), selected) && !selected {
 			pick(at)
 		}
 	}
-
-	imgui.EndCombo()
-}
-
-// propertyValue writes the value of a row of a property table, and records it
-// for the tests.
-func propertyValue(value string) {
-	gui.TextWrapped(value)
-	gui.Record(value)
 }
 
 // attachedTree lists the attachments that hang from one, by its number: each

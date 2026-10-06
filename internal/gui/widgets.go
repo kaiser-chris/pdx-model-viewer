@@ -189,6 +189,10 @@ func EndList() {
 
 // ListRow is a row of a list that can be picked, as wide as the list, with
 // room around its text. It reports whether it was clicked.
+//
+// A label may carry an id after "##", as any widget's may. The row draws the
+// part before it, and is looked up by the whole of it, so that two rows of the
+// same name in one list can be told apart.
 func ListRow(label string, selected bool) bool {
 	padding := ScaledVec2(listRowPadding.X, listRowPadding.Y)
 
@@ -204,9 +208,14 @@ func ListRow(label string, selected bool) bool {
 
 	imgui.PopStyleColorV(3)
 
+	visible, _, _ := strings.Cut(label, "##")
+	if visible == "" {
+		return clicked
+	}
+
 	origin := imgui.ItemRectMin()
 	imgui.WindowDrawList().AddTextVec2(imgui.Vec2{X: origin.X + padding.X, Y: origin.Y + padding.Y},
-		imgui.ColorU32Col(imgui.ColText), label)
+		imgui.ColorU32Col(imgui.ColText), visible)
 
 	return clicked
 }
