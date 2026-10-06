@@ -83,6 +83,20 @@ what it attaches in turn. One that is not there is marked, left out and
 listed under **Problems**. Of a group of attachments the game picks from at
 random, the first is shown.
 
+An entity whose mesh can play animations gets an **Animation** panel, docked
+along the bottom of the viewport. It lists what the entity and the entities it
+attaches can play, with how long each runs, and runs a clock over a timeline
+that reaches as far as the entity's longest animation, so the lengths can be
+seen against one another. **Play** runs it, **Loop** starts it again at its
+end, **Rewind** puts it back to the beginning, and the timeline can be dragged
+to any moment of it. The clock says which frame that moment is, and the rate
+the animation was made at.
+
+The geometry is not moved by this yet: the panel reads the animations and runs
+their clock, but the model is drawn in the pose its mesh file stores. Moving
+it needs the mesh's joints and weights carried through to the GPU, which the
+viewer does not do yet.
+
 The models are drawn with a shader of the viewer's own, an approximation of
 the games' look rather than their own shaders and lighting. It tells from the
 name of each part's shader how to draw it: skin with the palette colour,

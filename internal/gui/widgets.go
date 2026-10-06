@@ -244,6 +244,44 @@ func InputText(label, hint string, text *string) bool {
 	return changed
 }
 
+// Slider is a slider over a range of numbers, filling the width it is given,
+// whose handle can also be typed into by holding Ctrl and clicking it. format
+// is how the number is written on it, such as "%.2f s".
+func Slider(label string, value *float32, lowest, highest float32, format string) bool {
+	changed := imgui.SliderFloatV(fieldLabel(label), value, lowest, highest, format, 0)
+	record(label, false)
+
+	return changed
+}
+
+// BeginCombo starts a drop down of choices, filling the width it is given,
+// showing preview while it is closed. It is ended with imgui.EndCombo, and
+// only when it reports true.
+//
+// The choices are laid out in a window of the drop down's own, which
+// uitest.AnyCombo matches.
+func BeginCombo(label, preview string) bool {
+	// An open drop down makes its own window current, so the window the
+	// widget sits in has to be read before, as for a menu.
+	var where place
+	if recorder != nil {
+		where = currentPlace()
+	}
+
+	open := imgui.BeginComboV(fieldLabel(label), preview, 0)
+	recordIn(where, label, false)
+
+	return open
+}
+
+// ComboItem is one choice of a drop down BeginCombo started.
+func ComboItem(label string, selected bool) bool {
+	clicked := imgui.SelectableBoolV(label, selected, 0, imgui.NewVec2(0, 0))
+	record(label, selected)
+
+	return clicked
+}
+
 // InputInt is a field for a whole number, without the buttons that step it.
 func InputInt(label string, value *int32) bool {
 	changed := imgui.InputIntV(fieldLabel(label), value, 0, 0, 0)
@@ -276,6 +314,13 @@ func fieldLabel(label string) string {
 	imgui.SetNextItemWidth(-math.SmallestNonzeroFloat32)
 
 	return "##" + label
+}
+
+// FullWidth makes the next widget fill the width left in its window, for one
+// that has no label of its own to lay out, such as a timeline.
+func FullWidth() {
+	// -FLT_MIN is Dear ImGui's way of saying "up to the right edge".
+	imgui.SetNextItemWidth(-math.SmallestNonzeroFloat32)
 }
 
 // Label draws the label of a form row and moves the cursor to where the row's

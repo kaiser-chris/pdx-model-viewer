@@ -68,6 +68,24 @@ entity = {
 	// A file of meshes alone, for entities elsewhere to draw.
 	meshesAsset = `pdxmesh = { name = "spare_mesh" file = "statue.mesh" }`
 
+	// A windmill plays two animations, one of two seconds and one of four,
+	// so that a timeline reaches as far as the longer.
+	windmillAsset = `
+pdxmesh = {
+	name = "windmill_mesh"
+	file = "statue.mesh"
+	animation = { id = "idle_animation" type = "windmill_idle.anim" }
+	animation = { id = "turning_animation" type = "windmill_turning.anim" }
+	meshsettings = {
+		name = "quadShape"
+		index = 0
+		texture_diffuse = "statue_diffuse.png"
+		shader = "standard"
+	}
+}
+entity = { name = "windmill_entity" pdxmesh = "windmill_mesh" }
+`
+
 	// A plaza is nothing but the statues it attaches, and a fountain that is
 	// not there.
 	plazaAsset = `
@@ -139,6 +157,12 @@ func fixtureGame(t *testing.T) string {
 			statue + "pedestal.asset":        []byte(pedestalAsset),
 			statue + "meshes.asset":          []byte(meshesAsset),
 			statue + "plaza.asset":           []byte(plazaAsset),
+			statue + "windmill.asset":        []byte(windmillAsset),
+
+			// Two seconds of a clip made at fifteen frames a second, and
+			// four of one made at thirty.
+			statue + "windmill_idle.anim":    animationFile(15.5, 31),
+			statue + "windmill_turning.anim": animationFile(30.25, 121),
 			"../loose/outside.asset":         []byte(outsideAsset),
 			"../loose/outside.mesh":          meshtest.QuadFile(2, 2),
 		}
@@ -151,6 +175,35 @@ func fixtureGame(t *testing.T) string {
 	})
 
 	return fixture.root
+}
+
+// animationFile writes an .anim file of one joint that turns over the given
+// frames, at the given rate, the way the games write theirs. The length of an
+// animation is its frames over its rate, so 31 frames at 15.5 is two seconds.
+func animationFile(fps float32, frames int) []byte {
+	writer := meshtest.New()
+
+	writer.Object(1, "info").
+		Floats("fps", fps).
+		Ints("sa", int32(frames)).
+		Ints("j", 1)
+
+	writer.Object(2, "quadShape:root").
+		Strings("sa", "q").
+		Floats("t", 0, 0, 0).
+		Floats("q", 0, 0, 0, -1).
+		Floats("s", 1)
+
+	writer.Object(1, "samples")
+
+	turns := make([]float32, 0, frames*4)
+	for range frames {
+		turns = append(turns, 0, 0, 0, 1)
+	}
+
+	writer.Floats("q", turns...)
+
+	return writer.Bytes()
 }
 
 // fixtureFile is the path of a file of the fixture's statue folder.

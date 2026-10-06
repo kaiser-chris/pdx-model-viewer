@@ -3,13 +3,18 @@
 package app
 
 import (
+	"encoding/json"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/AllenDang/cimgui-go/imgui"
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	"github.com/kaiser-chris/pdx-model-viewer/internal/gui"
+	"github.com/kaiser-chris/pdx-model-viewer/internal/uitest"
 )
 
 // The windows the entity list and the error popup are laid out in. The list
@@ -540,5 +545,306 @@ func TestAboutWindow(t *testing.T) {
 
 	if driver.Exists(popupAbout, "Close") {
 		t.Error("the About window is still open after Close")
+	}
+}
+
+// An entity that can play animations gets a timeline, docked below the
+// viewport, whose controls run it and whose range reaches as far as its
+// longest animation. An entity with none is shown without the panel.
+func TestAnimationTimeline(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "windmill.asset"))
+	waitForEntity(application, driver, "windmill_entity")
+
+	animations := application.shown.loaded.Details.Animations
+	if len(animations) != 2 {
+		t.Fatalf("the windmill can play %+v, want two animations", animations)
+	}
+
+	if longest := application.shown.loaded.Details.LongestAnimation(); longest != 4 {
+		t.Errorf("its longest animation runs %gs, want 4", longest)
+	}
+
+	for _, label := range []string{labelPlay, labelLoop, labelRewind, labelTime, "Animation", textNotMoved} {
+		if !driver.Exists(panelAnimation, label) {
+			t.Errorf("the timeline does not show %q", label)
+		}
+	}
+
+	// It starts at the first animation, stopped at its beginning, and loops.
+	if application.animation != 0 || application.playing || application.animationTime != 0 {
+		t.Errorf("it starts at animation %d, playing %v, at %gs",
+			application.animation, application.playing, application.animationTime)
+	}
+
+	if !application.looping {
+		t.Error("it does not loop to begin with")
+	}
+
+	// The choices name each animation and how long it runs.
+	driver.Click(panelAnimation, "Animation")
+
+	for _, choice := range []string{"idle_animation  (2.00 s)##animation0", "turning_animation  (4.00 s)##animation1"} {
+		if !driver.Exists(uitest.AnyCombo, choice) {
+			t.Errorf("the picker does not offer %q", choice)
+		}
+	}
+
+	driver.Press(imgui.KeyEscape)
+
+	// Playing moves the clock on, and pausing leaves it where it got to.
+	driver.Click(panelAnimation, labelPlay)
+
+	if !application.playing {
+		t.Fatal("it did not start playing")
+	}
+
+	driver.WaitFor("the clock to move on", func() bool { return application.animationTime > 0 })
+
+	driver.Click(panelAnimation, labelPause)
+
+	stopped := application.animationTime
+	if application.playing {
+		t.Error("it did not pause")
+	}
+
+	driver.Frames(3)
+
+	if application.animationTime != stopped {
+		t.Errorf("paused at %gs, it moved on to %gs", stopped, application.animationTime)
+	}
+
+	// Rewinding puts it back to the start.
+	driver.Click(panelAnimation, labelRewind)
+
+	if application.animationTime != 0 {
+		t.Errorf("rewound to %gs", application.animationTime)
+	}
+
+	// An entity that can play nothing is shown without the panel.
+	openFile(t, application, driver, fixtureFile(t, "pedestal.asset"))
+	waitForEntity(application, driver, "pedestal_entity")
+
+	if len(application.animations()) != 0 {
+		t.Errorf("the statue can play %+v", application.animations())
+	}
+
+	if driver.Exists(panelAnimation, labelPlay) {
+		t.Error("the timeline shows for an entity that can play nothing")
+	}
+}
+
+// Picking another animation puts the timeline back to its start, and the
+// clock says which frame of it the time falls on.
+func TestPickAnAnimation(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "windmill.asset"))
+	waitForEntity(application, driver, "windmill_entity")
+
+	application.animationTime = 1
+	driver.Frame()
+
+	// A second into a clip of 31 frames made at 15 frames a second is frame
+	// fifteen.
+	if !driver.Exists(panelAnimation, "1.00 / 2.00 s     frame 15 of 31 at 15 fps") {
+		driver.Dump()
+		t.Error("the clock does not say where it stands")
+	}
+
+	driver.Click(panelAnimation, "Animation")
+	driver.Click(uitest.AnyCombo, "turning_animation  (4.00 s)##animation1")
+
+	if application.animation != 1 || application.animationTime != 0 {
+		t.Errorf("picked animation %d at %gs, want the second one from its start",
+			application.animation, application.animationTime)
+	}
+
+	if !driver.Exists(panelAnimation, "0.00 / 4.00 s     frame 0 of 121 at 30 fps") {
+		t.Error("the clock does not follow the animation picked")
+	}
+}
+
+// An animation that loops starts again at its end; one that does not stops
+// there.
+func TestLoopingAnAnimation(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "windmill.asset"))
+	waitForEntity(application, driver, "windmill_entity")
+
+	// Just short of the end of the two second animation, running.
+	application.animationTime = 1.99
+	application.playing = true
+
+	driver.WaitFor("the loop to come round", func() bool { return application.animationTime < 1.99 })
+
+	if !application.playing {
+		t.Error("a looping animation stopped at its end")
+	}
+
+	// Without the loop it stops at its end instead.
+	driver.Click(panelAnimation, labelLoop)
+
+	if application.looping {
+		t.Fatal("the loop did not come off")
+	}
+
+	application.animationTime = 1.99
+	application.playing = true
+
+	driver.WaitFor("it to stop at the end", func() bool { return !application.playing })
+
+	if application.animationTime != 2 {
+		t.Errorf("it stopped at %gs, want the end at 2", application.animationTime)
+	}
+}
+
+// A layout saved before the animation timeline existed knows nothing of it,
+// so it would open floating over the viewport. The next run puts it along the
+// bottom of the viewport, where the default layout puts it, and leaves the
+// rest of the arrangement alone.
+func TestTimelineIsPlacedInAnOlderLayout(t *testing.T) {
+	config := t.TempDir()
+
+	windmill := fixtureFile(t, "windmill.asset")
+
+	first, driver := startAppIn(t, config)
+
+	openFile(t, first, driver, windmill)
+	waitForEntity(first, driver, "windmill_entity")
+
+	// The panels of the first run are docked, the timeline among them.
+	animation, ok := gui.FindWindow(panelAnimation)
+	if !ok || animation.DockId() == 0 {
+		t.Fatal("the timeline was not docked by the default layout")
+	}
+
+	if first.settings.LayoutVersion != layoutVersion {
+		t.Errorf("the layout was saved as version %d, want %d", first.settings.LayoutVersion, layoutVersion)
+	}
+
+	first.Close()
+
+	// Wind the saved layout back to one made before the timeline existed.
+	forgetPanel(t, filepath.Join(config, "layout.ini"), panelAnimation)
+	setLayoutVersion(t, filepath.Join(config, "settings.json"), 0)
+
+	second, driver := startAppIn(t, config)
+
+	// Nothing is shown yet, so the viewport is left whole: an entity that can
+	// play nothing gets no strip below it.
+	driver.Frames(3)
+
+	if _, shown := gui.FindWindow(panelAnimation); shown && second.settings.LayoutVersion >= layoutVersion {
+		t.Error("the viewport was split before anything wanted the timeline")
+	}
+
+	openFile(t, second, driver, windmill)
+	waitForEntity(second, driver, "windmill_entity")
+
+	// The entities and details keep the places the saved layout gives them.
+	entities, ok := gui.FindWindow(panelEntities)
+	if !ok || entities.DockId() == 0 {
+		t.Fatal("the entities panel lost its place")
+	}
+
+	kept := entities.DockId()
+
+	driver.WaitFor("the timeline to be placed", func() bool {
+		placed, ok := gui.FindWindow(panelAnimation)
+
+		return ok && placed.DockId() != 0
+	})
+
+	if second.settings.LayoutVersion != layoutVersion {
+		t.Errorf("the layout was brought up to version %d, want %d", second.settings.LayoutVersion, layoutVersion)
+	}
+
+	if entities, ok := gui.FindWindow(panelEntities); !ok || entities.DockId() != kept {
+		t.Error("placing the timeline moved the entities panel")
+	}
+
+	// It sits below the viewport, which is what the user asked for.
+	timeline, _ := gui.FindWindow(panelAnimation)
+	viewport, _ := gui.FindWindow(panelViewport)
+
+	if timeline.Pos().Y <= viewport.Pos().Y {
+		t.Errorf("the timeline is at y %g, the viewport at %g; it should be below it",
+			timeline.Pos().Y, viewport.Pos().Y)
+	}
+
+	// A run after that leaves it wherever it ended up, rather than placing it
+	// again.
+	second.Close()
+
+	third, driver := startAppIn(t, config)
+
+	openFile(t, third, driver, windmill)
+	waitForEntity(third, driver, "windmill_entity")
+
+	if third.settings.LayoutVersion != layoutVersion {
+		t.Errorf("the next run saved version %d", third.settings.LayoutVersion)
+	}
+
+	again, ok := gui.FindWindow(panelAnimation)
+	if !ok || again.DockId() == 0 {
+		t.Error("the timeline did not come back docked")
+	}
+}
+
+// forgetPanel takes a window's section out of a saved layout, as a layout
+// written before that window existed would be.
+func forgetPanel(t *testing.T, path, panel string) {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var kept []string
+
+	dropping := false
+
+	for _, section := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(section, "[") {
+			dropping = strings.HasPrefix(section, "[Window]["+panel+"]")
+		}
+
+		if !dropping {
+			kept = append(kept, section)
+		}
+	}
+
+	if err := os.WriteFile(path, []byte(strings.Join(kept, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// setLayoutVersion rewrites the layout version of the saved settings.
+func setLayoutVersion(t *testing.T, path string, version int) {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var kept map[string]any
+	if err := json.Unmarshal(data, &kept); err != nil {
+		t.Fatal(err)
+	}
+
+	kept["layoutVersion"] = version
+
+	written, err := json.Marshal(kept)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, written, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

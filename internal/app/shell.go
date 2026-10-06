@@ -12,9 +12,10 @@ import (
 
 // The titles of the panels, which are also how the docking layout knows them.
 const (
-	panelViewport = "Viewport"
-	panelEntities = "Entities"
-	panelDetails  = "Details"
+	panelViewport  = "Viewport"
+	panelEntities  = "Entities"
+	panelDetails   = "Details"
+	panelAnimation = "Animation"
 
 	popupError = "Could Not Open the File"
 	popupAbout = "About"
@@ -30,17 +31,62 @@ const dockNodeFlagsDockSpace imgui.DockNodeFlags = 1 << 10
 const (
 	sideRatio     = 0.25
 	entitiesRatio = 0.4
+
+	// animationRatio is the share of the viewport's column the animation
+	// timeline takes along its bottom.
+	animationRatio = 0.22
 )
+
+// layoutVersion counts the panels the default layout places. A layout saved
+// by an earlier version of the viewer knows nothing of a panel added since,
+// so that panel would open floating over the viewport instead of where it
+// belongs; placeNewPanels puts it in its place once, leaving the rest of the
+// arrangement as the user left it.
+const layoutVersion = 1
 
 // dockSpace covers the remaining viewport with a dock space so every panel can
 // be rearranged, tabbed or torn off by the user.
 func (a *App) dockSpace() {
 	id := imgui.DockSpaceOverViewportV(0, imgui.MainViewport(), imgui.DockNodeFlagsPassthruCentralNode, a.dockWindowClass)
 
+	a.dockSpaceID = id
+
 	if !a.layoutBuilt {
 		a.layoutBuilt = true
+
 		a.buildDefaultLayout(id)
+		a.rememberLayoutVersion()
 	}
+}
+
+// placeTimeline puts the animation timeline along the bottom of the viewport
+// the first time it is shown, for a layout saved before the timeline existed,
+// which knows nothing of it and would leave it floating over the viewport.
+//
+// It waits for the timeline to be wanted rather than splitting the viewport
+// when the viewer starts, which would leave an empty strip below it for
+// everyone who never views an entity that can play anything. The viewport has
+// to be docked before its node can be split, which it is not on the first
+// frame of a run, so this keeps trying until it is.
+func (a *App) placeTimeline() {
+	if a.settings.LayoutVersion >= layoutVersion {
+		return
+	}
+
+	viewport, ok := gui.FindWindow(panelViewport)
+	if !ok || viewport.DockId() == 0 || a.dockSpaceID == 0 {
+		return
+	}
+
+	var timeline, rest imgui.ID
+	imgui.InternalDockBuilderSplitNode(viewport.DockId(), imgui.DirDown, animationRatio, &timeline, &rest)
+
+	imgui.InternalDockBuilderDockWindow(panelViewport, rest)
+	imgui.InternalDockBuilderDockWindow(panelAnimation, timeline)
+	imgui.InternalDockBuilderFinish(a.dockSpaceID)
+
+	// Placed once; from here on it is wherever the user leaves it.
+	a.rememberLayoutVersion()
 }
 
 // buildDefaultLayout puts the viewport on the left and a column on the right,
@@ -57,9 +103,15 @@ func (a *App) buildDefaultLayout(dockSpaceID imgui.ID) {
 	var top, bottom imgui.ID
 	imgui.InternalDockBuilderSplitNode(side, imgui.DirUp, entitiesRatio, &top, &bottom)
 
-	imgui.InternalDockBuilderDockWindow(panelViewport, center)
+	// The timeline goes along the bottom of the viewport, where it is below
+	// the model it moves.
+	var timeline, viewport imgui.ID
+	imgui.InternalDockBuilderSplitNode(center, imgui.DirDown, animationRatio, &timeline, &viewport)
+
+	imgui.InternalDockBuilderDockWindow(panelViewport, viewport)
 	imgui.InternalDockBuilderDockWindow(panelEntities, top)
 	imgui.InternalDockBuilderDockWindow(panelDetails, bottom)
+	imgui.InternalDockBuilderDockWindow(panelAnimation, timeline)
 
 	imgui.InternalDockBuilderFinish(dockSpaceID)
 }
@@ -97,6 +149,7 @@ func (a *App) menuBar() {
 	if gui.BeginMenu("View") {
 		gui.MenuToggle(panelEntities, "", &a.showEntities)
 		gui.MenuToggle(panelDetails, "", &a.showDetails)
+		gui.MenuToggle(panelAnimation, "", &a.showAnimation)
 
 		imgui.Separator()
 
@@ -112,6 +165,7 @@ func (a *App) menuBar() {
 			a.layoutBuilt = false
 			a.showEntities = true
 			a.showDetails = true
+			a.showAnimation = true
 		}
 
 		imgui.EndMenu()

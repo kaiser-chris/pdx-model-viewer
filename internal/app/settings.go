@@ -24,6 +24,11 @@ type settings struct {
 	// ExportSize is the width and height last set for the pictures of an
 	// export; none means the desktop's resolution.
 	ExportSize [2]int32 `json:"exportSize,omitzero"`
+
+	// LayoutVersion is the layout the saved panel arrangement was made for,
+	// so that a panel added since can be put where it belongs. See
+	// layoutVersion.
+	LayoutVersion int `json:"layoutVersion,omitempty"`
 }
 
 // loadSettings reads the settings, or none from a file that is missing or
@@ -73,6 +78,13 @@ func saveSettings(path string, kept settings) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		warn(err)
 	}
+}
+
+// rememberLayoutVersion records that the saved panel arrangement is up to
+// date with the panels the viewer has.
+func (a *App) rememberLayoutVersion() {
+	a.settings.LayoutVersion = layoutVersion
+	saveSettings(a.settingsFile, a.settings)
 }
 
 // withRecentFile puts a file at the top of a list of recent files, once, and

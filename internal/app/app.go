@@ -109,13 +109,26 @@ type App struct {
 	layoutBuilt bool
 	showAbout   bool
 
-	showEntities bool
-	showDetails  bool
-	turning      bool
+	showEntities  bool
+	showDetails   bool
+	showAnimation bool
+	turning       bool
+
+	// The state of the animation timeline: which of the entity's animations
+	// is picked, whether it is running, whether it starts again at its end,
+	// and how far into it the timeline stands, in seconds.
+	animation     int
+	playing       bool
+	looping       bool
+	animationTime float64
 
 	// paletteChosen is set once the user picks a palette colour, which is
 	// kept from then on rather than chosen for each entity.
 	paletteChosen bool
+
+	// dockSpaceID is the dock space of the current frame, which placing a
+	// panel in a layout saved before it existed needs.
+	dockSpaceID imgui.ID
 
 	// dockWindowClass is handed to the dock space every frame. cimgui-go
 	// dereferences that argument even when it is nil, so one default instance
@@ -183,14 +196,16 @@ func New(options Options) (*App, error) {
 	settingsFile := configFile(config, "settings.json")
 
 	application := &App{
-		games:        map[string]*workspace.Game{},
-		showEntities: true,
-		showDetails:  true,
-		layoutBuilt:  fileExists(layout),
-		status:       "Open an asset file to view its entities",
-		settings:     loadSettings(settingsFile),
-		settingsFile: settingsFile,
-		scale:        options.Scale,
+		games:         map[string]*workspace.Game{},
+		showEntities:  true,
+		showDetails:   true,
+		showAnimation: true,
+		looping:       true,
+		layoutBuilt:   fileExists(layout),
+		status:        "Open an asset file to view its entities",
+		settings:      loadSettings(settingsFile),
+		settingsFile:  settingsFile,
+		scale:         options.Scale,
 	}
 
 	icon, err := png.Decode(bytes.NewReader(assets.Icon))
@@ -331,6 +346,7 @@ func (a *App) frame() {
 	a.viewportPanel()
 	a.entitiesPanel()
 	a.detailsPanel()
+	a.animationPanel()
 
 	a.errorPopup()
 	a.aboutPopup()
@@ -454,6 +470,9 @@ func (a *App) selectEntity(name string) {
 
 	a.document.selected = name
 	a.document.failure = ""
+
+	// The timeline belongs to the entity on view, so it starts afresh.
+	a.resetAnimation()
 
 	if a.loading != nil {
 		return

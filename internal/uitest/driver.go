@@ -81,6 +81,10 @@ const (
 	// AnyMenu matches the window of whichever menu is open. Menus are named
 	// after their label, as in Databases###Menu_00.
 	AnyMenu = "###Menu_"
+
+	// AnyCombo matches the window of whichever drop down is open, which Dear
+	// ImGui names ##Combo_00 and so on, whatever the widget is called.
+	AnyCombo = "##Combo_"
 )
 
 // maxWaitFrames bounds WaitFor. Frames run unthrottled in a hidden window, so
@@ -495,6 +499,8 @@ func matchesWindow(name, want string) bool {
 		return true
 	case want == AnyMenu:
 		return strings.Contains(name, AnyMenu)
+	case want == AnyCombo:
+		return strings.HasPrefix(name, AnyCombo)
 	case strings.HasSuffix(want, "_"), strings.HasSuffix(want, "/"):
 		return strings.HasPrefix(name, want)
 	default:

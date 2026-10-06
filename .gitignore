@@ -17,6 +17,9 @@
 /.idea/
 /.run/
 
+# Notes handed from one working session to the next
+/handoff.md
+
 # The Windows resources of the application, generated from internal/gui/resources.rc
 !/internal/gui/rsrc_windows_amd64.syso
 

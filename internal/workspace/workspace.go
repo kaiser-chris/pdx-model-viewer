@@ -206,6 +206,16 @@ type Details struct {
 	// Attached are the entities attached to the entity, and to those in
 	// turn, numbered as the model numbers them: n is Attached[n-1].
 	Attached []model.Attachment
+
+	// Animations are the animations the entity and the entities attached to
+	// it can play, those of the entity's own mesh first.
+	Animations []model.Animation
+}
+
+// LongestAnimation is how long the longest animation of the entity runs, in
+// seconds, which is how far a timeline showing all of them reaches.
+func (d Details) LongestAnimation() float64 {
+	return model.Longest(d.Animations)
 }
 
 // PartsOf are the parts of one attachment, by its number: 0 for the entity's
@@ -307,7 +317,7 @@ func (d Details) UsesPalette() bool {
 }
 
 func (g *Game) describe(name string, built *model.Model) Details {
-	details := Details{Entity: name, Attached: built.Attached}
+	details := Details{Entity: name, Attached: built.Attached, Animations: built.Animations}
 
 	for index, entity := range g.assets.CloneChain(name) {
 		if index == 0 {

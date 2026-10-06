@@ -84,6 +84,48 @@ entity = {
 )
 
 // game writes a game folder with the statue and a DLC, and returns it.
+// windmillAsset is a mesh that can play two animations, of two seconds and of
+// four, and an entity that draws it.
+const windmillAsset = `
+pdxmesh = {
+	name = "windmill_mesh"
+	file = "statue.mesh"
+	animation = { id = "idle_animation" type = "windmill_idle.anim" }
+	animation = { id = "turning_animation" type = "windmill_turning.anim" }
+	meshsettings = { name = "quadShape" index = 0 texture_diffuse = "statue_diffuse.png" shader = "standard" }
+}
+entity = { name = "windmill_entity" pdxmesh = "windmill_mesh" }
+`
+
+// animationFile writes an .anim file of one joint that turns over the given
+// frames, at the given rate. An animation's length is its frames over its
+// rate, so 31 frames at 15.5 is two seconds.
+func animationFile(fps float32, frames int) string {
+	writer := meshtest.New()
+
+	writer.Object(1, "info").
+		Floats("fps", fps).
+		Ints("sa", int32(frames)).
+		Ints("j", 1)
+
+	writer.Object(2, "quadShape:root").
+		Strings("sa", "q").
+		Floats("t", 0, 0, 0).
+		Floats("q", 0, 0, 0, -1).
+		Floats("s", 1)
+
+	writer.Object(1, "samples")
+
+	turns := make([]float32, 0, frames*4)
+	for range frames {
+		turns = append(turns, 0, 0, 0, 1)
+	}
+
+	writer.Floats("q", turns...)
+
+	return string(writer.Bytes())
+}
+
 func game(t *testing.T) string {
 	t.Helper()
 
@@ -97,6 +139,10 @@ func game(t *testing.T) string {
 		"gfx/models/statue/statue_entities.asset":     statueEntityAsset,
 		"dlc/dlc001_statues/gfx/models/dlc/dlc.asset": dlcAsset,
 		"gfx/models/plaza/plaza.asset":                plazaAsset,
+
+		"gfx/models/statue/windmill.asset":        windmillAsset,
+		"gfx/models/statue/windmill_idle.anim":    animationFile(15.5, 31),
+		"gfx/models/statue/windmill_turning.anim": animationFile(30.25, 121),
 	})
 
 	return dir
@@ -414,5 +460,49 @@ func TestOpenLoose(t *testing.T) {
 	missing, err := game.Load("Another_entity")
 	if err != nil || len(missing.Model.Parts) != 0 || len(missing.Diagnostics) == 0 {
 		t.Errorf("entity of a mesh no file defines = %+v, %v; want nothing, reported", missing, err)
+	}
+}
+
+// The animations an entity can play are listed with its details, with how
+// long each runs, and the longest of them is how far a timeline reaches.
+func TestLoadAnimations(t *testing.T) {
+	opened, err := OpenGame(game(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := opened.Load("windmill_entity")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	details := loaded.Details
+
+	var listed []string
+	for _, animation := range details.Animations {
+		listed = append(listed, fmt.Sprintf("%s of %s runs %.2fs over %d frames at %.0f fps",
+			animation.ID, animation.Entity, animation.Seconds, animation.Frames, animation.Rate()))
+	}
+
+	want := []string{
+		"idle_animation of windmill_entity runs 2.00s over 31 frames at 15 fps",
+		"turning_animation of windmill_entity runs 4.00s over 121 frames at 30 fps",
+	}
+	if !slices.Equal(listed, want) {
+		t.Errorf("animations = %q, want %q", listed, want)
+	}
+
+	if got := details.LongestAnimation(); got != 4 {
+		t.Errorf("the longest runs %gs, want 4", got)
+	}
+
+	// An entity whose mesh names no animation has none.
+	still, err := opened.Load("statue_entity")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(still.Details.Animations) != 0 || still.Details.LongestAnimation() != 0 {
+		t.Errorf("the statue can play %+v", still.Details.Animations)
 	}
 }
