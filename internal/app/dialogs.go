@@ -18,6 +18,11 @@ import (
 type fileDialogs interface {
 	chooseAssetFile(folder string) (string, error)
 
+	// chooseGameFolder asks for the folder a game is installed in, which a
+	// mod whose game Steam does not know about needs. It returns an empty
+	// path and no error when the user cancels.
+	chooseGameFolder() (string, error)
+
 	// chooseExportFile asks where to save a picture, proposing a path, and
 	// chooseExportFolder asks for the folder to save several in.
 	chooseExportFile(proposed string) (string, error)
@@ -46,6 +51,19 @@ func (d systemDialogs) chooseAssetFile(folder string) (string, error) {
 	}
 
 	path, err := zenity.SelectFile(options...)
+	if errors.Is(err, zenity.ErrCanceled) {
+		return "", nil
+	}
+
+	return path, err
+}
+
+func (d systemDialogs) chooseGameFolder() (string, error) {
+	path, err := zenity.SelectFile(
+		zenity.Title("Where Is the Game Installed?"),
+		zenity.Directory(),
+		d.parent,
+	)
 	if errors.Is(err, zenity.ErrCanceled) {
 		return "", nil
 	}
@@ -83,8 +101,9 @@ func (d systemDialogs) chooseExportFolder(folder string) (string, error) {
 	return path, err
 }
 
-// pendingDialog is an open file dialog, answered on a goroutine of its own so
-// that the window keeps drawing meanwhile.
+// A dialog is answered on a goroutine of its own so that the window keeps
+// drawing meanwhile, and is either the file dialog or the one asking where a
+// game is installed.
 type pendingDialog = job[string]
 
 // askForAssetFile shows the system's file dialog for an asset file, starting

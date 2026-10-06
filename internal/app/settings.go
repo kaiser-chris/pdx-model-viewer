@@ -29,6 +29,11 @@ type settings struct {
 	// so that a panel added since can be put where it belongs. See
 	// layoutVersion.
 	LayoutVersion int `json:"layoutVersion,omitempty"`
+
+	// ModGames are the games the viewer was told mods are for, by the root of
+	// the mod. A mod whose own description does not name a game would
+	// otherwise ask again every time it is opened.
+	ModGames map[string]string `json:"modGames,omitempty"`
 }
 
 // loadSettings reads the settings, or none from a file that is missing or

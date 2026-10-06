@@ -65,7 +65,7 @@ func sortedNames(names []string) []string {
 func SourceName(root string) string {
 	name := filepath.Base(root)
 
-	if strings.EqualFold(name, "game") {
+	if strings.EqualFold(name, gameFolder) {
 		if install := filepath.Base(filepath.Dir(root)); install != "" && install != "." && install != string(filepath.Separator) {
 			return install
 		}
@@ -82,6 +82,12 @@ type Game struct {
 	// Root is the folder the files were read from, and Name what it is called.
 	Root string
 	Name string
+
+	// Install is the game a mod was read with: the mod's own files are read
+	// over the game's, the way the game mounts them, so an entity the mod
+	// does not define still comes from the game. It is the zero Installation
+	// for a game folder read on its own, and for a loose file.
+	Install Installation
 
 	// Diagnostics are the problems with the folder itself, such as one that
 	// holds no game files.
@@ -105,24 +111,56 @@ type Game struct {
 // folder of an installation, are read before the root, the way the engine
 // mounts them: some of the textures are theirs.
 func OpenGame(root string) (*Game, error) {
+	return openGame(root, Installation{}, "")
+}
+
+// OpenMod reads a mod together with the game it is for: the game's own files
+// are read first and the mod's over them, so that what the mod does not
+// replace still comes from the game. The engine's folders are the game's, not
+// the mod's, which has none.
+//
+// Without the game a mod is read as if it were one, which leaves every entity
+// and texture of the game itself missing.
+func OpenMod(location Location, install Installation) (*Game, error) {
+	return openGame(location.Root, install, location.Name)
+}
+
+func openGame(root string, install Installation, modName string) (*Game, error) {
 	start := time.Now()
-	name := SourceName(root)
+
+	// A mod is named the way it names itself, which is what its metadata is
+	// for; anything else is named after its folder.
+	name := cmp.Or(modName, SourceName(root))
 
 	own := folders.Open([]folders.Source{{Name: name, Path: root}})
 	if len(own.Names()) == 0 {
 		return nil, fmt.Errorf("%s holds no game or mod files", root)
 	}
 
-	set := folders.Open(append(entity.EngineFolders(root), folders.Source{Name: name, Path: root}))
+	// The engine's folders belong to the installation, which for a mod is the
+	// game's rather than the mod's.
+	engine := root
+	if install.Install != "" {
+		engine = install.Root
+	}
+
+	sources := append(entity.EngineFolders(engine), folders.Source{Name: SourceName(engine), Path: engine})
+
+	if !sameFolder(engine, root) {
+		sources = append(sources, folders.Source{Name: name, Path: root})
+	}
+
+	set := folders.Open(sources)
 
 	assets := asset.Load(set)
 
 	game := &Game{
-		Root:   root,
-		Name:   name,
-		set:    set,
-		assets: assets,
-		loader: entity.NewLoader(set, assets),
+		Root:    root,
+		Name:    name,
+		Install: install,
+		set:     set,
+		assets:  assets,
+		loader:  entity.NewLoader(set, assets),
 	}
 
 	game.Diagnostics = append(game.Diagnostics, set.Diagnostics...)

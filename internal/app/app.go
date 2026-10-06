@@ -9,6 +9,7 @@ package app
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"image/png"
 	"os"
@@ -66,6 +67,11 @@ type App struct {
 	// so that opening another file of the same game does not read it again.
 	games map[string]*workspace.Game
 
+	// installations are the games of the three the viewer reads that are on
+	// this machine, which Steam is asked about once. A mod is read against
+	// the installation of the game it is for.
+	installations []workspace.Installation
+
 	// document is the asset file open now, and opening the one being opened.
 	document *document
 	opening  *job[*document]
@@ -81,8 +87,15 @@ type App struct {
 	reselect string
 
 	// dialogs asks the user for a file, and dialog is the one open now.
-	dialogs fileDialogs
-	dialog  *pendingDialog
+	// gameFolder is the dialog asking where a game is installed, which the
+	// chooser for a mod whose game cannot be worked out offers.
+	dialogs    fileDialogs
+	dialog     *pendingDialog
+	gameFolder *pendingDialog
+
+	// pending is a file of a mod whose game the viewer could not work out,
+	// which the chooser is asking about.
+	pending *pendingOpen
 
 	// The export: its window's choices, the dialog asking where to, the
 	// export to draw next frame, the files being written, and where the last
@@ -160,6 +173,11 @@ type document struct {
 	listing  workspace.Listing
 	game     *workspace.Game
 
+	// key is what the game's files are kept by, which for a mod is its own
+	// root together with the installation it was read with: the same mod
+	// reads differently against another installation of its game.
+	key string
+
 	// selected is the entity picked from the file, and failure why it could
 	// not be shown.
 	selected string
@@ -214,6 +232,7 @@ func New(options Options) (*App, error) {
 
 	application := &App{
 		games:               map[string]*workspace.Game{},
+		installations:       workspace.Installations(),
 		showEntities:        true,
 		showDetails:         true,
 		showAnimation:       true,
@@ -356,6 +375,7 @@ const turnSpeed = 0.6
 // frame builds one frame of the interface.
 func (a *App) frame() {
 	a.pollDialog()
+	a.pollGameFolder()
 	a.pollOpening()
 	a.pollLoading()
 	a.pollDroppedFiles()
@@ -380,6 +400,7 @@ func (a *App) frame() {
 
 	a.errorPopup()
 	a.aboutPopup()
+	a.gamePopup()
 	a.exportWindow()
 
 	a.handleShortcuts()
@@ -389,6 +410,10 @@ func (a *App) frame() {
 // defines and reading the game's definitions, which takes a moment, so it
 // happens off the drawing thread. A file whose game has been read already
 // skips that part.
+//
+// A file of a mod is read together with the game the mod is for. A mod that
+// does not say which game that is, or whose game is on none of the Steam
+// libraries of this machine, waits for the chooser instead.
 func (a *App) Open(file string) {
 	location, err := workspace.Locate(file)
 	if err != nil {
@@ -398,35 +423,90 @@ func (a *App) Open(file string) {
 		return
 	}
 
+	if !location.Mod {
+		a.beginOpen(location, workspace.Installation{})
+
+		return
+	}
+
+	// Which game the mod is for: what the mod says itself, which is what the
+	// modder meant, or what the user answered for it before.
+	product := cmp.Or(location.Product, a.rememberedGame(location.Root))
+
+	install, found := a.installationFor(product)
+	if !found {
+		// Nothing on this machine to read the mod against, so which game it
+		// is, and where that game is, is the user's to say.
+		a.askForGame(location, product)
+
+		return
+	}
+
+	a.beginOpen(location, install)
+}
+
+// beginOpen reads the asset files of the game or mod an asset file belongs to
+// and lists what the file defines.
+func (a *App) beginOpen(location workspace.Location, install workspace.Installation) {
+	key := openKey(location, install)
+
 	// The game is looked up here rather than in the job, since the jobs must
 	// not touch the application's state.
-	known := a.games[location.Key()]
+	known := a.games[key]
 
 	a.opening = start(func() (*document, error) {
-		opened := &document{location: location, listing: workspace.List(location), game: known}
-
-		if opened.game == nil {
-			open := func() (*workspace.Game, error) { return workspace.OpenGame(location.Root) }
-			if location.Loose {
-				open = func() (*workspace.Game, error) { return workspace.OpenLoose(location) }
-			}
-
-			game, err := open()
-			if err != nil {
-				return nil, err
-			}
-
-			opened.game = game
+		opened := &document{
+			key:      key,
+			location: location,
+			listing:  workspace.List(location),
+			game:     known,
 		}
+
+		if opened.game != nil {
+			return opened, nil
+		}
+
+		var (
+			game *workspace.Game
+			err  error
+		)
+
+		switch {
+		case location.Loose:
+			game, err = workspace.OpenLoose(location)
+		case location.Mod:
+			game, err = workspace.OpenMod(location, install)
+		default:
+			game, err = workspace.OpenGame(location.Root)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		opened.game = game
 
 		return opened, nil
 	})
 
-	if known == nil {
-		a.setStatus("Reading the asset files of %s", workspace.SourceName(location.Root))
-	} else {
+	if known != nil {
 		a.setStatus("Opening %s", filepath.Base(location.File))
+
+		return
 	}
+
+	a.setStatus("Reading the asset files of %s", location.DisplayName())
+}
+
+// openKey is what a game's files are kept by. For a mod it is its own root
+// together with the installation it is read with, since the same mod reads
+// differently against another installation of its game.
+func openKey(location workspace.Location, install workspace.Installation) string {
+	if location.Mod {
+		return location.Root + "\x00" + install.Root
+	}
+
+	return location.Key()
 }
 
 // pollOpening shows the file that was being opened, once it is.
@@ -449,7 +529,7 @@ func (a *App) pollOpening() {
 		return
 	}
 
-	a.games[opened.location.Key()] = opened.game
+	a.games[opened.key] = opened.game
 	a.document = opened
 	a.rememberRecentFile(opened.location.File)
 	a.search = ""
@@ -482,7 +562,7 @@ func (a *App) reload() {
 		return
 	}
 
-	delete(a.games, a.document.location.Key())
+	delete(a.games, a.document.key)
 
 	// The entity picked is picked again once the file is open, if it is still
 	// there.

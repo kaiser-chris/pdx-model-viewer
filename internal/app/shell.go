@@ -19,6 +19,7 @@ const (
 
 	popupError = "Could Not Open the File"
 	popupAbout = "About"
+	popupGame  = "Which Game Is This Mod For?"
 )
 
 // dockNodeFlagsDockSpace is ImGuiDockNodeFlags_DockSpace from imgui_internal.h.

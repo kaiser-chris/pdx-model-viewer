@@ -250,6 +250,14 @@ func (a *App) entitiesBody() {
 	gui.Record(document.game.Name)
 	gui.Tooltip(document.location.Root)
 
+	// A mod is named the way it names itself, which does not say which game
+	// it is a mod of.
+	if document.location.Mod {
+		readWith := "A mod of " + document.game.Install.Product.String()
+		gui.DimmedText(readWith)
+		gui.Tooltip("Read with " + document.game.Install.Root)
+	}
+
 	if document.game.Loose() {
 		gui.DimmedText(looseNote)
 		gui.Tooltip("The meshes and textures are looked for around the file and by their names next to it. A missing texture shows as a checkerboard, a missing mesh as nothing.")

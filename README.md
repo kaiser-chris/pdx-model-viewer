@@ -30,8 +30,36 @@ where the file is:
 - a DLC, below the game's `dlc` folder, belongs to the game, so that what it
   uses from the game is found as well.
 
-A mod that draws meshes or textures of the game it changes is not supported
-yet: it is read on its own.
+### Mods
+
+A mod is read together with the game it is for: the game's own files are read
+first and the mod's over them, the way the game mounts them, so an entity the
+mod does not define, and every mesh and texture of the game itself, still
+comes from the game.
+
+Which game that is comes from the mod's own description of itself:
+
+- a Victoria 3 or Europa Universalis 5 mod has a `.metadata` folder with a
+  `metadata.json` in it, whose `game_id` names the game;
+- a Crusader Kings 3 mod has a `descriptor.mod`, and a mod that has one of
+  those and no `.metadata` folder is read as a Crusader Kings 3 mod;
+- where a mod carries both and its `metadata.json` names a game, that is the
+  one: it is the newer description of the two, and the only one that names a
+  game at all.
+
+The game is looked for through Steam, which is the only place all three are
+sold: in the registry on Windows, and in the folders Steam keeps itself in
+everywhere else, its Flatpak and Snap packages and macOS among them. The
+library each game is installed in is read from Steam's own files, so a game
+that was moved to another drive is still found. Nothing else on the machine is
+searched, so a folder of game files that Steam did not install is left for
+**Browse...**.
+
+A mod that names no game, or whose game is not installed, is asked about. The
+chooser lists the three games, each with where it is installed, and
+**Browse...** points the viewer at the folder of a game kept outside Steam —
+either the folder holding the game folder or the game folder itself. What the
+chooser is answered is kept, so the same mod is not asked about again.
 
 A file outside the `gfx` folder of any game or mod, such as one kept on its own
 with its meshes and textures, is drawn as well as it can be, on its own:
@@ -47,14 +75,15 @@ with its meshes and textures, is drawn as well as it can be, on its own:
   under **Problems**.
 
 The game's asset definitions are read once, which takes under a second, and
-kept while the viewer runs, so the next file of the same game opens at once.
-**File → Reload** (`F5`) reads them again, for files that changed since.
+kept while the viewer runs, so the next file of the same game or mod opens at
+once. **File → Reload** (`F5`) reads them again, for files that changed since.
 
 ### Viewing
 
 A file with one entity shows it at once; a file with several lists them on the
-right, to pick one from. The arrow keys step through the list, and the search
-box narrows it down.
+right, to pick one from. Above the list is the game or mod the file belongs to,
+named the way a mod names itself, and, for a mod, which game it is read with.
+The arrow keys step through the list, and the search box narrows it down.
 
 | In the viewport                | Effect                          |
 |--------------------------------|---------------------------------|
@@ -114,10 +143,11 @@ none.
 
 The viewer opens maximized the first time, and after that the way it was
 closed: maximized or not, and at the size and place it had. The window, the
-layout of the panels, the recent files and the export folder are kept in
-`%AppData%\pdx-model-viewer` on Windows and in `~/.config/pdx-model-viewer`
-on Linux. **View → Reset Layout** puts the panels back: the viewport on the
-left, and on the right the entities above the details.
+layout of the panels, the recent files, the export folder and the game last
+answered for a mod are kept in `%AppData%\pdx-model-viewer` on Windows and in
+`~/.config/pdx-model-viewer` on Linux. **View → Reset Layout** puts the panels
+back: the viewport on the left, and on the right the entities above the
+details.
 
 ### Exporting
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -51,11 +52,21 @@ func TestSettingsAreKept(t *testing.T) {
 		t.Errorf("settings of no file = %+v, want none", got)
 	}
 
-	kept := settings{RecentFiles: []string{"a.asset", "b.asset"}, ExportFolder: "out", ExportSize: [2]int32{800, 600}}
+	kept := settings{
+		RecentFiles:  []string{"a.asset", "b.asset"},
+		ExportFolder: "out",
+		ExportSize:   [2]int32{800, 600},
+		ModGames:     map[string]string{"/mods/gate": "victoria3"},
+	}
 	saveSettings(path, kept)
 
-	if got := loadSettings(path); !slices.Equal(got.RecentFiles, kept.RecentFiles) || got.ExportFolder != kept.ExportFolder || got.ExportSize != kept.ExportSize {
+	got := loadSettings(path)
+	if !slices.Equal(got.RecentFiles, kept.RecentFiles) || got.ExportFolder != kept.ExportFolder || got.ExportSize != kept.ExportSize {
 		t.Errorf("read back %+v, want %+v", got, kept)
+	}
+
+	if !maps.Equal(got.ModGames, kept.ModGames) {
+		t.Errorf("the games kept for mods read back as %v, want %v", got.ModGames, kept.ModGames)
 	}
 
 	if err := os.WriteFile(path, []byte("{broken"), 0o644); err != nil {

@@ -14,6 +14,7 @@
 package workspace
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +30,10 @@ const Extension = ".asset"
 // gfxFolder is the folder the games read their asset files from, anywhere
 // below it.
 const gfxFolder = "gfx"
+
+// gameFolder is the folder of an installation the game's own asset files are
+// read from. The engine's own folders, clausewitz and jomini, sit next to it.
+const gameFolder = "game"
 
 // dlcFolder is where a game keeps its DLCs, each a root of its own.
 const dlcFolder = "dlc"
@@ -54,6 +59,19 @@ type Location struct {
 
 	// Loose is set for a file in no gfx folder, which belongs to no game.
 	Loose bool
+
+	// Mod is set for a file of a mod, which is read together with the game it
+	// is for rather than on its own.
+	Mod bool
+
+	// Product is the game a mod is for, from the mod's own description, or
+	// NoProduct when it does not say, which is for the user to decide. It is
+	// NoProduct for a game folder as well, whose game needs no deciding.
+	Product Product
+
+	// Name is what a mod calls itself, when it says. A game folder has none,
+	// and is named after its installation.
+	Name string
 }
 
 // Key is what what is read for a file is kept by: its game's root, or for a
@@ -64,6 +82,12 @@ func (l Location) Key() string {
 	}
 
 	return l.Root
+}
+
+// DisplayName is what the game or mod a file belongs to is called: the name a
+// mod gives itself, or the folder it is in.
+func (l Location) DisplayName() string {
+	return cmp.Or(l.Name, SourceName(l.Root))
 }
 
 // Locate works out the game or mod an asset file belongs to.
@@ -116,7 +140,18 @@ func Locate(file string) (Location, error) {
 		root = filepath.Dir(parent)
 	}
 
-	return Location{File: absolute, Relative: filepath.ToSlash(relative), Root: root}, nil
+	// A root that describes itself is a mod, which is read with the game it
+	// is for rather than on its own.
+	described := Describe(root)
+
+	return Location{
+		File:     absolute,
+		Relative: filepath.ToSlash(relative),
+		Root:     root,
+		Mod:      described.Mod,
+		Product:  described.Product,
+		Name:     described.Name,
+	}, nil
 }
 
 // enclosingGfx finds the gfx folder nearest above a file.
@@ -170,8 +205,39 @@ func holdsMarker(dir string) bool {
 	return false
 }
 
+// isRoot reports whether a folder is the root of a game or mod: one that holds
+// game files itself, or holds the layers that do.
+//
+// Europa Universalis 5 keeps no common or gfx folder of its own: its files are
+// in in_game, main_menu and loading_screen, so the folder holding those is the
+// root, as it is for its DLCs and its mods.
+func isRoot(dir string) bool {
+	if holdsMarker(dir) {
+		return true
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && holdsMarker(filepath.Join(dir, entry.Name())) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 
 	return err == nil
+}
+
+func isDirectory(path string) bool {
+	info, err := os.Stat(path)
+
+	return err == nil && info.IsDir()
 }

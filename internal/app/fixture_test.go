@@ -16,6 +16,7 @@ import (
 	"github.com/kaiser-chris/pdx-asset-go/mesh/meshtest"
 
 	"github.com/kaiser-chris/pdx-model-viewer/internal/uitest"
+	"github.com/kaiser-chris/pdx-model-viewer/internal/workspace"
 )
 
 // The fixture game is a statue: a quad, drawn by several entities in several
@@ -127,6 +128,20 @@ entity = {
 `
 )
 
+// A mod draws the statue's mesh, which only the game it is a mod of defines:
+// an entity of it loads when the mod was read together with its game, and not
+// when it was read on its own.
+const modAsset = `entity = { name = "mod_entity" pdxmesh = "statue_mesh" }`
+
+// The descriptions the fixture mods carry, which are what tells the viewer
+// which game each is for: a classifier, none at all, and a descriptor.mod.
+const (
+	namedModMetadata     = `{ "name": "Named Mod", "id": "com.github.test.named", "game_id": "victoria3" }`
+	namelessModMetadata  = `{ "name": "Nameless Mod", "id": "com.github.test.nameless", "version": "1.0" }`
+	ambiguousModMetadata = `{ "name": "Ambiguous Mod", "id": "com.github.test.ambiguous", "version": "1.0" }`
+	oldModDescriptor     = "name=\"Old Mod\"\nversion=\"1.0\"\nsupported_version=\"1.19.*\"\n"
+)
+
 var (
 	fixtureRed  = color.NRGBA{R: 220, G: 30, B: 30, A: 255}
 	fixtureBlue = color.NRGBA{R: 30, G: 30, B: 220, A: 255}
@@ -197,6 +212,26 @@ func fixtureGame(t *testing.T) string {
 			statue + "windmill_turning.anim": animationFile(30.25, 121),
 			"../loose/outside.asset":         []byte(outsideAsset),
 			"../loose/outside.mesh":          meshtest.QuadFile(2, 2),
+
+			// A second installation, so that a mod can be read against the
+			// wrong game as well as the right one.
+			"../Kingdoms/game/common/README.txt": nil,
+
+			// The mods: one that names its game, one that says nothing, one
+			// that only has the descriptor Crusader Kings 3 writes, and one
+			// that carries both descriptions and names no game.
+			"../mods/named/.metadata/metadata.json":     []byte(namedModMetadata),
+			"../mods/named/gfx/models/statue/mod.asset": []byte(modAsset),
+
+			"../mods/nameless/.metadata/metadata.json":     []byte(namelessModMetadata),
+			"../mods/nameless/gfx/models/statue/mod.asset": []byte(modAsset),
+
+			"../mods/old/descriptor.mod":              []byte(oldModDescriptor),
+			"../mods/old/gfx/models/statue/mod.asset": []byte(modAsset),
+
+			"../mods/ambiguous/.metadata/metadata.json":     []byte(ambiguousModMetadata),
+			"../mods/ambiguous/descriptor.mod":              []byte(oldModDescriptor),
+			"../mods/ambiguous/gfx/models/statue/mod.asset": []byte(modAsset),
 		}
 
 		for name, content := range files {
@@ -299,6 +334,53 @@ func fixtureFile(t *testing.T, name string) string {
 	return filepath.Join(fixtureGame(t), "gfx", "models", "statue", name)
 }
 
+// fixtureModFile is the path of a file of one of the fixture's mods, by the
+// name of the mod's folder.
+func fixtureModFile(t *testing.T, mod, name string) string {
+	t.Helper()
+
+	return filepath.Join(fixtureMod(t, mod), "gfx", "models", "statue", name)
+}
+
+// fixtureMod is the root of one of the fixture's mods.
+func fixtureMod(t *testing.T, mod string) string {
+	t.Helper()
+
+	// The mods sit beside the game folder of the installation the fixture
+	// game is in, the way a mod folder sits beside a game's own.
+	return filepath.Join(filepath.Dir(fixtureGame(t)), "mods", mod)
+}
+
+// fixtureInstallations are the games a test pretends are on this machine: the
+// fixture game as Victoria 3, and a second installation as Crusader Kings 3,
+// which nothing but the mods of the fixture is in.
+//
+// A test never sees the installations of the machine it runs on, so what it
+// tests does not depend on which games are bought and installed there.
+func fixtureInstallations(t *testing.T) []workspace.Installation {
+	t.Helper()
+
+	game := fixtureGame(t)
+	other := filepath.Join(filepath.Dir(game), "Kingdoms")
+
+	return []workspace.Installation{
+		{Product: workspace.Victoria3, Install: filepath.Dir(game), Root: game},
+		{Product: workspace.CrusaderKings3, Install: other, Root: filepath.Join(other, "game")},
+	}
+}
+
+// fixtureRow is the chooser's row for one of the games, reading the way the
+// chooser reads it for the installations a test gave the application.
+func fixtureRow(installations []workspace.Installation, product workspace.Product) string {
+	for _, install := range installations {
+		if install.Product == product {
+			return install.String()
+		}
+	}
+
+	return product.String() + textNotFound
+}
+
 // solid is a PNG of one colour, which stands in for a texture.
 func solid(t *testing.T, fill color.NRGBA) []byte {
 	t.Helper()
@@ -321,9 +403,11 @@ func solid(t *testing.T, fill color.NRGBA) []byte {
 // fakeDialogs answers the file dialog with paths a test hands it, and cancels
 // once it has none left.
 type fakeDialogs struct {
-	mu      sync.Mutex
-	answers []string
-	folders []string
+	mu       sync.Mutex
+	answers  []string
+	folders  []string
+	games    []string
+	askedFor []string
 }
 
 func (f *fakeDialogs) chooseAssetFile(folder string) (string, error) {
@@ -340,6 +424,42 @@ func (f *fakeDialogs) chooseAssetFile(folder string) (string, error) {
 	f.answers = f.answers[1:]
 
 	return answer, nil
+}
+
+// chooseGameFolder answers with the folders a test hands it, in order, and
+// cancels once it has none left.
+func (f *fakeDialogs) chooseGameFolder() (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if len(f.games) == 0 {
+		return "", nil
+	}
+
+	answer := f.games[0]
+	f.games = f.games[1:]
+
+	f.askedFor = append(f.askedFor, answer)
+
+	return answer, nil
+}
+
+// answerGameFolders hands the folder dialog the folders a test wants picked,
+// in order.
+func (f *fakeDialogs) answerGameFolders(folders ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.games = append(f.games, folders...)
+}
+
+// gameFoldersAsked is how many times the folder dialog for a game was
+// answered, which is how many times it was shown.
+func (f *fakeDialogs) gameFoldersAsked() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return len(f.askedFor)
 }
 
 func (f *fakeDialogs) chooseExportFile(proposed string) (string, error) {
@@ -386,6 +506,7 @@ func startAppIn(t *testing.T, config string) (*App, *uitest.Driver) {
 	// A test never gets to see a real dialog: this one cancels whatever it is
 	// asked, until a test hands it answers.
 	application.dialogs = &fakeDialogs{}
+	application.installations = fixtureInstallations(t)
 
 	return application, uitest.New(t, application)
 }
