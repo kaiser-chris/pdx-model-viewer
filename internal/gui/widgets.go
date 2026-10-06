@@ -221,6 +221,21 @@ func ListRowPitch() float32 {
 	return imgui.TextLineHeight() + 2*Scaled(listRowPadding.Y) + Scaled(listRowGap)
 }
 
+// TreeNode is imgui.TreeNodeEx, as wide as the space it is in. A leaf has
+// nothing to open: it reports false, and only a node that reports true is
+// closed with imgui.TreePop.
+func TreeNode(label string, leaf bool) bool {
+	flags := imgui.TreeNodeFlagsSpanAvailWidth
+	if leaf {
+		flags |= imgui.TreeNodeFlagsLeaf | imgui.TreeNodeFlagsNoTreePushOnOpen
+	}
+
+	open := imgui.TreeNodeExStrV(label, flags)
+	record(label, false)
+
+	return open && !leaf
+}
+
 // InputText is a text field with a hint shown while it is empty.
 func InputText(label, hint string, text *string) bool {
 	changed := imgui.InputTextWithHint(fieldLabel(label), hint, text, 0, nil)

@@ -195,17 +195,56 @@ type Details struct {
 	Clones []string
 
 	// Mesh is the pdxmesh the entity draws, and MeshFile the file that
-	// pdxmesh names, below the game's root.
+	// pdxmesh names, below the game's root. An entity that is nothing but
+	// what it attaches has neither.
 	Mesh     string
 	MeshFile string
 
+	// Parts are those of the entity and of every entity attached to it.
 	Parts []PartDetails
+
+	// Attached are the entities attached to the entity, and to those in
+	// turn, numbered as the model numbers them: n is Attached[n-1].
+	Attached []model.Attachment
+}
+
+// PartsOf are the parts of one attachment, by its number: 0 for the entity's
+// own.
+func (d Details) PartsOf(attachment int) []PartDetails {
+	var parts []PartDetails
+
+	for _, part := range d.Parts {
+		if part.Attachment == attachment {
+			parts = append(parts, part)
+		}
+	}
+
+	return parts
+}
+
+// AttachedTo are the numbers of the attachments that hang from one, by its
+// number: 0 for what the entity attaches itself.
+func (d Details) AttachedTo(attachment int) []int {
+	var numbers []int
+
+	for index, attached := range d.Attached {
+		if attached.Parent == attachment {
+			numbers = append(numbers, index+1)
+		}
+	}
+
+	return numbers
 }
 
 // PartDetails describe one part of a model.
 type PartDetails struct {
 	Name   string
 	Shader string
+
+	// Entity is the entity the part is of, and Attachment the number of its
+	// attachment, 0 for the entity's own.
+	Entity     string
+	Attachment int
 
 	// Style is how the viewer draws the part, which it tells from the
 	// shader's name.
@@ -268,7 +307,7 @@ func (d Details) UsesPalette() bool {
 }
 
 func (g *Game) describe(name string, built *model.Model) Details {
-	details := Details{Entity: name}
+	details := Details{Entity: name, Attached: built.Attached}
 
 	for index, entity := range g.assets.CloneChain(name) {
 		if index == 0 {
@@ -288,6 +327,8 @@ func (g *Game) describe(name string, built *model.Model) Details {
 		described := PartDetails{
 			Name:       part.Name,
 			Shader:     part.Shader,
+			Entity:     part.Entity,
+			Attachment: part.Attachment,
 			Style:      render.StyleOf(&part),
 			Diffuse:    part.Textures.Diffuse != nil,
 			Normal:     part.Textures.Normal != nil,

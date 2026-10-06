@@ -67,6 +67,18 @@ entity = {
 
 	// A file of meshes alone, for entities elsewhere to draw.
 	meshesAsset = `pdxmesh = { name = "spare_mesh" file = "statue.mesh" }`
+
+	// A plaza is nothing but the statues it attaches, and a fountain that is
+	// not there.
+	plazaAsset = `
+entity = {
+	name = "plaza_entity"
+	locator = { name = "left" position = { -2 0 0 } }
+	locator = { name = "right" position = { 2 0 0 } }
+	attach = { left = "statue_entity" right = "painted_entity" }
+	attach = { right = "fountain_entity" }
+}
+`
 )
 
 var (
@@ -126,6 +138,7 @@ func fixtureGame(t *testing.T) string {
 			statue + "statue_properties.png": solid(t, fixtureProperties),
 			statue + "pedestal.asset":        []byte(pedestalAsset),
 			statue + "meshes.asset":          []byte(meshesAsset),
+			statue + "plaza.asset":           []byte(plazaAsset),
 			"../loose/outside.asset":         []byte(outsideAsset),
 			"../loose/outside.mesh":          meshtest.QuadFile(2, 2),
 		}

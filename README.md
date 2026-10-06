@@ -41,7 +41,10 @@ with its meshes and textures, is drawn as well as it can be, on its own:
   game with the files it uses works;
 - a texture of colour that is not there shows as a magenta and black
   checkerboard, a missing normal or properties map is left out, and a missing
-  mesh, or one defined in another asset file, shows as nothing.
+  mesh, or one defined in another asset file, shows as nothing;
+- an entity it attaches that it does not define is looked for in the asset
+  files next to it, and one that is not there either is left out and listed
+  under **Problems**.
 
 The game's asset definitions are read once, which takes under a second, and
 kept while the viewer runs, so the next file of the same game opens at once.
@@ -69,6 +72,16 @@ triangles. The names the files give a part and its shader show when the
 pointer rests on its name. Parts the game does not draw, such as collision
 shapes, are listed as such and left out. **Problems** lists what could not be read, such as
 a texture that was not found, which is drawn with a neutral stand in.
+
+An entity is drawn with the entities it attaches, and those they attach,
+each where it hangs: at a locator of the entity or of its mesh, or at a bone
+of its mesh. An entity attaches entities by name, wherever in the game they
+are defined, and some are nothing but what they attach, such as the hubs of
+Victoria 3, which lay out a whole town. **Details** lists them under
+**Attached**, each with the point it hangs from, opening onto its parts and
+what it attaches in turn. One that is not there is marked, left out and
+listed under **Problems**. Of a group of attachments the game picks from at
+random, the first is shown.
 
 The models are drawn with a shader of the viewer's own, an approximation of
 the games' look rather than their own shaders and lighting. It tells from the
@@ -114,7 +127,8 @@ they stay one group: `statue_entity_front_1.png`, `statue_entity_back_1.png`.
 
 What pdx-asset-go does not draw yet, the viewer does not show either:
 
-- skinning and animation: models are drawn in the pose their mesh files store;
+- skinning and animation: models are drawn in the pose their mesh files store,
+  so a rider stands on the saddle rather than sitting in it;
 - the games' own shaders and the lighting of their environments: the look is
   an approximation;
 - the files of `pdxmesh` definitions that no entity of the file draws.

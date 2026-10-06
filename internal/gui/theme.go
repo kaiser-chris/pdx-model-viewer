@@ -149,6 +149,12 @@ var (
 	colorError   = rgb(0xE0625A)
 )
 
+// PushWarningColor draws the text that follows in the warning colour, until
+// imgui.PopStyleColor.
+func PushWarningColor() {
+	imgui.PushStyleColorVec4(imgui.ColText, colorWarning)
+}
+
 // WarningText is wrapped text in the warning colour.
 func WarningText(text string) {
 	coloredWrapped(colorWarning, text)

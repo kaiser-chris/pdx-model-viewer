@@ -418,14 +418,23 @@ func (a *App) detailsBody() {
 			propertyRow("Clones", strings.Join(details.Clones, ", "))
 		}
 
-		propertyRow("Mesh", details.Mesh)
-		propertyRow("Mesh file", details.MeshFile)
+		if details.Mesh != "" {
+			propertyRow("Mesh", details.Mesh)
+			propertyRow("Mesh file", details.MeshFile)
+		} else {
+			propertyRow("Mesh", "None")
+		}
 
 		imgui.EndTable()
 	}
 
 	imgui.SeparatorText("Parts")
-	a.partsTable()
+	ownParts(details)
+
+	if count := len(details.Attached); count > 0 {
+		imgui.SeparatorText(fmt.Sprintf("Attached (%d)", count))
+		attachedTree(details, 0)
+	}
 
 	// What the files did not have.
 	if count := len(loaded.Diagnostics); count > 0 {
@@ -460,20 +469,83 @@ func propertyRow(name, value string) {
 	gui.Record(value)
 }
 
-// partsTable lists the parts of the model: the shapes of its mesh, how each
-// is drawn, which of their textures were found, and how large they are. The
-// names the files give them are in a tooltip, for whoever needs them.
-func (a *App) partsTable() {
-	parts := a.shown.loaded.Details.Parts
-	if len(parts) == 0 {
-		gui.DimmedText("The mesh holds no geometry.")
+// ownParts lists the parts of the entity's own mesh, or says why it has none.
+func ownParts(details workspace.Details) {
+	parts := details.PartsOf(0)
 
-		return
+	switch {
+	case len(parts) > 0:
+		partsTable("##parts", parts)
+	case details.Mesh != "":
+		gui.DimmedText(textNoGeometry)
+	case len(details.Attached) > 0:
+		gui.DimmedText(textOnlyAttached)
+	default:
+		gui.DimmedText(textNoMesh)
 	}
+}
 
+// What the parts section says of an entity without parts of its own.
+const (
+	textNoGeometry   = "The mesh holds no geometry."
+	textOnlyAttached = "The entity draws no mesh of its own, only what it attaches."
+	textNoMesh       = "The entity draws no mesh."
+)
+
+// attachedTree lists the attachments that hang from one, by its number: each
+// entity with the point it hangs from, opening onto its parts and onto what
+// it attaches in turn. One that is not drawn is in the warning colour, and
+// Problems says why.
+func attachedTree(details workspace.Details, parent int) {
+	for _, number := range details.AttachedTo(parent) {
+		attached := details.Attached[number-1]
+		parts := details.PartsOf(number)
+		further := details.AttachedTo(number)
+		leaf := attached.Missing || (len(parts) == 0 && len(further) == 0)
+
+		if attached.Missing {
+			gui.PushWarningColor()
+		}
+
+		open := gui.TreeNode(fmt.Sprintf("%s##attached%d", attached.Entity, number), leaf)
+
+		if attached.Missing {
+			imgui.PopStyleColor()
+		}
+
+		switch {
+		case attached.Missing:
+			gui.Tooltip("Not drawn: see Problems")
+		case leaf:
+			gui.Tooltip("Draws no mesh")
+		}
+
+		where := "at " + attached.Locator
+
+		imgui.SameLine()
+		gui.TextDisabled(where)
+		gui.Record(where)
+
+		if !open {
+			continue
+		}
+
+		if len(parts) > 0 {
+			partsTable(fmt.Sprintf("##parts%d", number), parts)
+		}
+
+		attachedTree(details, number)
+		imgui.TreePop()
+	}
+}
+
+// partsTable lists parts of the model: the shapes of a mesh, how each is
+// drawn, which of their textures were found, and how large they are. The
+// names the files give them are in a tooltip, for whoever needs them.
+func partsTable(id string, parts []workspace.PartDetails) {
 	flags := imgui.TableFlagsSizingStretchProp | imgui.TableFlagsRowBg | imgui.TableFlagsBordersInnerH | imgui.TableFlagsPadOuterX
 
-	if !imgui.BeginTableV("##parts", 2, flags, imgui.Vec2{}, 0) {
+	if !imgui.BeginTableV(id, 2, flags, imgui.Vec2{}, 0) {
 		return
 	}
 

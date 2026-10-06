@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -9,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kaiser-chris/pdx-parser-go/report"
 
 	"github.com/kaiser-chris/pdx-asset-go/mesh/meshtest"
 )
@@ -60,6 +63,24 @@ pdxmesh = { name = "bare_mesh" file = "statue.mesh" }
 	dlcAsset = `
 entity = { name = "dlc_statue_entity" pdxmesh = "statue_mesh" }
 `
+
+	// A plaza is nothing but the statues it attaches, from files of their
+	// own, one of them on a pedestal, and one it attaches that is not there.
+	plazaAsset = `
+entity = {
+	name = "plaza_entity"
+	locator = { name = "left" position = { -5 0 0 } }
+	locator = { name = "right" position = { 5 0 0 } }
+	attach = { left = "statue_entity" right = "pedestal_entity" }
+	attach = { right = "fountain_entity" }
+}
+entity = {
+	name = "pedestal_entity"
+	pdxmesh = "statue_mesh"
+	locator = { name = "top" position = { 0 4 0 } }
+	attach = { top = "copy_entity" }
+}
+`
 )
 
 // game writes a game folder with the statue and a DLC, and returns it.
@@ -75,6 +96,7 @@ func game(t *testing.T) string {
 		"gfx/models/statue/statue_diffuse.png":        picture(t),
 		"gfx/models/statue/statue_entities.asset":     statueEntityAsset,
 		"dlc/dlc001_statues/gfx/models/dlc/dlc.asset": dlcAsset,
+		"gfx/models/plaza/plaza.asset":                plazaAsset,
 	})
 
 	return dir
@@ -167,6 +189,109 @@ func TestLoad(t *testing.T) {
 
 	if len(loaded.Diagnostics) != 1 || !strings.Contains(loaded.Diagnostics[0].Message, "statue_normal.png") {
 		t.Errorf("diagnostics = %v, want the missing normal map", loaded.Diagnostics)
+	}
+}
+
+// An entity of nothing but attachments is drawn with them, and its details
+// say what hangs where, and which parts are whose.
+func TestLoadAttachments(t *testing.T) {
+	opened, err := OpenGame(game(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := opened.Load("plaza_entity")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	details := loaded.Details
+
+	var attached []string
+	for _, attachment := range details.Attached {
+		attached = append(attached, fmt.Sprintf("%s at %s of %s, missing %v", attachment.Entity, attachment.Locator, attachment.To, attachment.Missing))
+	}
+
+	want := []string{
+		"statue_entity at left of plaza_entity, missing false",
+		"pedestal_entity at right of plaza_entity, missing false",
+		"copy_entity at top of pedestal_entity, missing false",
+		"fountain_entity at right of plaza_entity, missing true",
+	}
+	if !slices.Equal(attached, want) {
+		t.Errorf("attached = %q, want %q", attached, want)
+	}
+
+	if details.Mesh != "" || len(details.PartsOf(0)) != 0 {
+		t.Errorf("mesh %q and parts %+v of its own, want none", details.Mesh, details.PartsOf(0))
+	}
+
+	if got := details.AttachedTo(0); !slices.Equal(got, []int{1, 2, 4}) {
+		t.Errorf("attached to the plaza = %v, want the statue, the pedestal and the fountain", got)
+	}
+
+	if got := details.AttachedTo(2); !slices.Equal(got, []int{3}) {
+		t.Errorf("attached to the pedestal = %v, want the copy on it", got)
+	}
+
+	for number, entity := range map[int]string{1: "statue_entity", 2: "pedestal_entity", 3: "copy_entity"} {
+		if parts := details.PartsOf(number); len(parts) != 1 || parts[0].Entity != entity {
+			t.Errorf("parts of attachment %d = %+v, want the quad of %s", number, parts, entity)
+		}
+	}
+
+	if len(loaded.Model.Parts) != 3 {
+		t.Errorf("model of %d parts, want the three statues", len(loaded.Model.Parts))
+	}
+
+	if !slices.ContainsFunc(loaded.Diagnostics, func(d report.Diagnostic) bool { return strings.Contains(d.Message, "fountain_entity") }) {
+		t.Errorf("diagnostics = %v, want the missing fountain", loaded.Diagnostics)
+	}
+}
+
+// A loose file attaches an entity of an asset file next to it.
+func TestOpenLooseAttachesItsNeighbours(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "my_models")
+	tree(t, dir, map[string]string{
+		"plaza.asset":  plazaAsset,
+		"statue.asset": statueMeshAsset + statueEntityAsset,
+		"statue.mesh":  string(meshtest.QuadFile(2, 2)),
+	})
+
+	location, err := Locate(filepath.Join(dir, "plaza.asset"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	game, err := OpenLoose(location)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := game.Load("plaza_entity")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The statue next to it, the pedestal of its own file, and the copy the
+	// pedestal attaches, next to that; the fountain nowhere.
+	if len(loaded.Model.Parts) != 2 {
+		t.Errorf("model of %d parts, want the statue and the copy; the pedestal's mesh is in another file", len(loaded.Model.Parts))
+	}
+
+	missing := 0
+	for _, attachment := range loaded.Details.Attached {
+		if attachment.Missing {
+			missing++
+
+			if attachment.Entity != "fountain_entity" {
+				t.Errorf("%s is missing", attachment.Entity)
+			}
+		}
+	}
+
+	if missing != 1 {
+		t.Errorf("attached = %+v, want the fountain alone missing", loaded.Details.Attached)
 	}
 }
 

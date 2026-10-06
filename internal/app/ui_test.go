@@ -118,6 +118,41 @@ func TestDetailsDescribeTheParts(t *testing.T) {
 	}
 }
 
+// An entity of nothing but attachments shows them, and its details list what
+// hangs where, each opening onto its parts. What is not there is marked and
+// listed among the problems.
+func TestDetailsListTheAttachments(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "plaza.asset"))
+	waitForEntity(application, driver, "plaza_entity")
+
+	if parts := len(application.shown.loaded.Model.Parts); parts != 2 {
+		t.Errorf("the plaza is drawn with %d parts, want both statues", parts)
+	}
+
+	for _, text := range []string{textOnlyAttached, "statue_entity##attached1", "painted_entity##attached2", "fountain_entity##attached3", "at left", "at right"} {
+		if !driver.Exists(panelDetails, text) {
+			t.Errorf("the details do not show %q", text)
+		}
+	}
+
+	if !driver.Exists(panelDetails, "entity plaza_entity attaches fountain_entity, which is not defined; drawn without it") {
+		t.Error("the missing fountain is not among the problems")
+	}
+
+	// The parts of an attachment show once it is opened.
+	if driver.Exists(panelDetails, "Quad") {
+		t.Error("the parts of the statues show before they are opened")
+	}
+
+	driver.Click(panelDetails, "painted_entity##attached2")
+
+	if !driver.Exists(panelDetails, "Quad") {
+		t.Error("the painted statue opened without its part")
+	}
+}
+
 func TestSearchNarrowsTheList(t *testing.T) {
 	application, driver := startApp(t)
 
