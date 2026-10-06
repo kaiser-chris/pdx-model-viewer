@@ -17,7 +17,7 @@ const (
 	panelDetails  = "Details"
 
 	popupError = "Could Not Open the File"
-	popupAbout = "About " + applicationName
+	popupAbout = "About"
 )
 
 // dockNodeFlagsDockSpace is ImGuiDockNodeFlags_DockSpace from imgui_internal.h.
@@ -273,27 +273,39 @@ func (a *App) aboutPopup() {
 		imgui.OpenPopupStr(popupAbout)
 	}
 
-	imgui.SetNextWindowSizeV(gui.ScaledVec2(420, 0), imgui.CondAppearing)
+	imgui.SetNextWindowSizeV(gui.ScaledVec2(460, 0), imgui.CondAlways)
 
-	if !imgui.BeginPopupModalV(popupAbout, nil, imgui.WindowFlagsNoSavedSettings) {
+	if !imgui.BeginPopupModalV(popupAbout, nil, imgui.WindowFlagsNoResize|imgui.WindowFlagsNoSavedSettings) {
 		return
 	}
+	defer imgui.EndPopup()
 
 	gui.PushStrongFont()
-	imgui.TextUnformatted(applicationName)
+	imgui.TextUnformatted(applicationName + " " + applicationVersion)
 	gui.PopFont()
-	gui.TextDisabled("Version " + applicationVersion)
+	gui.Record(applicationName + " " + applicationVersion)
 
-	imgui.Spacing()
-	gui.TextWrapped("Views the 3D models of the asset files of Victoria 3, Europa Universalis 5 and Crusader Kings 3.")
-	imgui.Spacing()
+	gui.DimmedText(aboutDescription)
 
-	gui.DimmedText("Reads the games' files with pdx-asset-go and pdx-parser-go, and draws with raylib and Dear ImGui. Set in Roboto, under the SIL Open Font License.")
-	imgui.Spacing()
+	imgui.Separator()
+
+	gui.DimmedText("Rendered with raylib, interface built with Dear ImGui.")
+
+	gui.PushStrongFont()
+	imgui.SeparatorText("Credits")
+	gui.PopFont()
+
+	for _, credit := range credits {
+		credit.show()
+		imgui.Spacing()
+	}
+
+	imgui.Separator()
 
 	if gui.Button("Close") || imgui.IsKeyPressedBool(imgui.KeyEscape) {
 		imgui.CloseCurrentPopup()
 	}
-
-	imgui.EndPopup()
 }
+
+// aboutDescription says what the application is, under its name.
+const aboutDescription = "Model viewer for asset files of Victoria 3, Europa Universalis 5 and Crusader Kings 3."

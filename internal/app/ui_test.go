@@ -475,3 +475,35 @@ func TestPaletteIsOfferedWhereItShows(t *testing.T) {
 		t.Error("a statue offers a palette colour, which does not show on it")
 	}
 }
+
+// The About window names the application and its version, says what it is
+// and what it is built with, credits the works it uses, and closes again.
+func TestAboutWindow(t *testing.T) {
+	_, driver := startApp(t)
+
+	driver.Menu("Help", "About")
+	driver.Frames(2)
+
+	for _, text := range []string{
+		applicationName + " " + applicationVersion,
+		aboutDescription,
+		"Rendered with raylib, interface built with Dear ImGui.",
+	} {
+		if !driver.Exists(popupAbout, text) {
+			t.Errorf("the About window does not say %q", text)
+		}
+	}
+
+	for _, credit := range credits {
+		if !driver.Exists(popupAbout, credit.work) {
+			t.Errorf("the About window does not credit %s", credit.work)
+		}
+	}
+
+	driver.Click(popupAbout, "Close")
+	driver.Frames(2)
+
+	if driver.Exists(popupAbout, "Close") {
+		t.Error("the About window is still open after Close")
+	}
+}
