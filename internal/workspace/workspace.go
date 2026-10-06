@@ -259,6 +259,14 @@ func (d Details) Portrait() bool {
 	})
 }
 
+// UsesPalette reports whether the palette colour shows on an entity: whether
+// any part it draws blends it in, as skin does.
+func (d Details) UsesPalette() bool {
+	return slices.ContainsFunc(d.Parts, func(part PartDetails) bool {
+		return part.Drawn && part.Style.Palette
+	})
+}
+
 func (g *Game) describe(name string, built *model.Model) Details {
 	details := Details{Entity: name}
 

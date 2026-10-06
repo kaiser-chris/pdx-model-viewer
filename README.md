@@ -73,8 +73,14 @@ name of each part's shader how to draw it: skin with the palette colour,
 decals laid over the rest, leaves and hair cut out by their alpha.
 
 The palette colour is what the games blend in where a diffuse map's alpha says,
-such as a skin tone. The viewer picks a skin tone for a portrait's skin and no
-tint for anything else, until you pick one yourself.
+such as a skin tone. It only shows on parts drawn as skin, so **Details**
+offers it only for an entity that has some, as the skin tone of a portrait.
+The viewer picks a skin tone for a portrait's skin and no tint for anything
+else, until you pick one yourself.
+
+Trees, whose leaves the games keep grey and colour as they draw them, are
+coloured by the tint their files name, or a green of leaves where they name
+none.
 
 The viewer opens maximized the first time, and after that the way it was
 closed: maximized or not, and at the size and place it had. The window and

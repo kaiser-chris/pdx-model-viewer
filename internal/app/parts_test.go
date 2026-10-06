@@ -36,6 +36,8 @@ func TestPartLook(t *testing.T) {
 		{workspace.PartDetails{Drawn: true, Style: render.Style{Blend: true}}, "Laid over the model like a decal"},
 		{workspace.PartDetails{Drawn: true, Style: render.Style{Cutout: true, TwoSided: true}}, "Cut out like leaves or hair, seen from both sides"},
 		{workspace.PartDetails{Drawn: true, Style: render.Style{Palette: true, Atlas: true}}, "Solid, tinted with the palette colour and textured from an atlas"},
+		{workspace.PartDetails{Drawn: true, Style: render.Style{Cutout: true, Tinted: true}}, "Cut out like leaves or hair, coloured by its tint"},
+		{workspace.PartDetails{Drawn: true, Style: render.Style{Cutout: true, Foliage: true}}, "Cut out like leaves or hair, its grey coloured as leaves"},
 		{workspace.PartDetails{}, "Not drawn: the game uses it for something other than looks, such as collisions"},
 	} {
 		if got := partLook(test.part); got != test.want {

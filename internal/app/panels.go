@@ -590,13 +590,29 @@ func problemText(problem report.Diagnostic) {
 
 // displaySettings are what the model is drawn with beyond its own files.
 func (a *App) displaySettings() {
-	look := &a.viewer.Look
+	details := a.shown.loaded.Details
 
-	imgui.SetNextItemWidth(fullWidth)
-	if imgui.ColorEdit3V("##palette", &look.PaletteColor, imgui.ColorEditFlagsNoLabel) {
-		a.paletteChosen = true
+	// The palette colour only shows on skin, so it is only offered for an
+	// entity that has some.
+	if details.UsesPalette() {
+		label := labelPalette
+		if details.Portrait() {
+			label = labelSkinTone
+		}
+
+		look := &a.viewer.Look
+
+		imgui.TextDisabled(label)
+		gui.Record(label)
+		imgui.SameLine()
+		imgui.SetNextItemWidth(fullWidth)
+
+		if imgui.ColorEdit3V("##palette", &look.PaletteColor, imgui.ColorEditFlagsNoLabel) {
+			a.paletteChosen = true
+		}
+
+		imgui.SetItemTooltip("Blended into the parts drawn as skin, where the alpha of their diffuse map says")
 	}
-	imgui.SetItemTooltip("The palette colour, such as a skin tone: blended in where the alpha of a part's diffuse map says")
 
 	gui.Checkbox("Turn automatically", &a.turning)
 
@@ -604,6 +620,12 @@ func (a *App) displaySettings() {
 		a.resetCamera()
 	}
 }
+
+// The labels of the palette colour: on a portrait it is the skin tone.
+const (
+	labelPalette  = "Palette colour"
+	labelSkinTone = "Skin tone"
+)
 
 // looseNote says what a loose file, one of no game, is drawn with.
 const looseNote = "Outside any game: drawn with the files around it."

@@ -108,6 +108,14 @@ func partLook(part workspace.PartDetails) string {
 		more = append(more, "tinted with the palette colour")
 	}
 
+	if style.Tinted {
+		more = append(more, "coloured by its tint")
+	}
+
+	if style.Foliage {
+		more = append(more, "its grey coloured as leaves")
+	}
+
 	if style.TwoSided {
 		more = append(more, "seen from both sides")
 	}

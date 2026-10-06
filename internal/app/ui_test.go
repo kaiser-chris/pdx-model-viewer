@@ -453,3 +453,25 @@ func redder(c interface{ RGBA() (r, g, b, a uint32) }) bool {
 
 	return r > g+0x2000 && r > b+0x2000
 }
+
+// The palette colour is offered only for an entity it shows on, named the
+// skin tone on a portrait.
+func TestPaletteIsOfferedWhereItShows(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "statue.asset"))
+
+	driver.Click(windowEntityList, "skin_entity")
+	waitForEntity(application, driver, "skin_entity")
+
+	if !driver.Exists(panelDetails, labelSkinTone) {
+		t.Error("a portrait's skin offers no skin tone")
+	}
+
+	driver.Click(windowEntityList, "statue_entity")
+	waitForEntity(application, driver, "statue_entity")
+
+	if driver.Exists(panelDetails, labelSkinTone) || driver.Exists(panelDetails, labelPalette) {
+		t.Error("a statue offers a palette colour, which does not show on it")
+	}
+}
