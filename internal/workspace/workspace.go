@@ -14,6 +14,7 @@ import (
 	"github.com/kaiser-chris/pdx-parser-go/folders"
 	"github.com/kaiser-chris/pdx-parser-go/report"
 
+	"github.com/kaiser-chris/pdx-asset-go/anim"
 	"github.com/kaiser-chris/pdx-asset-go/entity"
 	"github.com/kaiser-chris/pdx-asset-go/model"
 	"github.com/kaiser-chris/pdx-asset-go/render"
@@ -289,6 +290,17 @@ func (g *Game) Load(name string) (*Loaded, error) {
 	built.Bounds()
 
 	return &Loaded{Model: built, Details: details, Diagnostics: diagnostics}, nil
+}
+
+// ReadAnimation reads the whole of an animation file, samples and all, given
+// its path below the game's root, as Details.Animations lists. Listing reads
+// only the head of each file; this is for playing one, whose samples move the
+// geometry.
+func (g *Game) ReadAnimation(relative string) (*anim.Animation, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	return g.loader.ReadAnimation(relative)
 }
 
 // drawn reports whether the game draws a part: one its mesh settings say how

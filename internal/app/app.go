@@ -18,6 +18,7 @@ import (
 	"github.com/AllenDang/cimgui-go/imgui"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
+	"github.com/kaiser-chris/pdx-asset-go/anim"
 	"github.com/kaiser-chris/pdx-asset-go/render"
 
 	"github.com/kaiser-chris/pdx-model-viewer/assets"
@@ -122,6 +123,22 @@ type App struct {
 	looping       bool
 	animationTime float64
 
+	// animationSamples is the selected animation read whole, samples and
+	// all, which moving the geometry needs, and animationSamplesFor which of
+	// the entity's animations it is. animationReading is the one being read,
+	// for animationReadingFor.
+	animationSamples    *anim.Animation
+	animationSamplesFor int
+	animationReading    *job[*anim.Animation]
+	animationReadingFor int
+
+	// animationEnabled says which attachments the animation picked moves, by
+	// their number: an entity attached many times can have some of its copies
+	// stand still. animationEnabledFor is the animation it was filled in for,
+	// all of them ticked to begin with.
+	animationEnabled    map[int]bool
+	animationEnabledFor int
+
 	// paletteChosen is set once the user picks a palette colour, which is
 	// kept from then on rather than chosen for each entity.
 	paletteChosen bool
@@ -196,16 +213,17 @@ func New(options Options) (*App, error) {
 	settingsFile := configFile(config, "settings.json")
 
 	application := &App{
-		games:         map[string]*workspace.Game{},
-		showEntities:  true,
-		showDetails:   true,
-		showAnimation: true,
-		looping:       true,
-		layoutBuilt:   fileExists(layout),
-		status:        "Open an asset file to view its entities",
-		settings:      loadSettings(settingsFile),
-		settingsFile:  settingsFile,
-		scale:         options.Scale,
+		games:               map[string]*workspace.Game{},
+		showEntities:        true,
+		showDetails:         true,
+		showAnimation:       true,
+		looping:             true,
+		animationEnabledFor: -1,
+		layoutBuilt:         fileExists(layout),
+		status:              "Open an asset file to view its entities",
+		settings:            loadSettings(settingsFile),
+		settingsFile:        settingsFile,
+		scale:               options.Scale,
 	}
 
 	icon, err := png.Decode(bytes.NewReader(assets.Icon))
@@ -319,6 +337,16 @@ func (a *App) drawOffscreen() {
 		a.viewer.Rotate(float64(rl.GetFrameTime())*turnSpeed, 0)
 	}
 
+	// The clock is advanced before the picture is drawn, so that the pose
+	// the picture shows is the pose the timeline stands at.
+	a.advanceAnimation()
+
+	if samples, ok := a.pose(); ok {
+		a.shown.model.Pose(samples, a.animationTime, a.looping, a.animatedAttachments())
+	} else {
+		a.shown.model.Pose(nil, 0, false, nil)
+	}
+
 	a.viewer.Draw(a.shown.model)
 }
 
@@ -332,6 +360,8 @@ func (a *App) frame() {
 	a.pollLoading()
 	a.pollDroppedFiles()
 	a.pollExport()
+	a.pollAnimationReading()
+	a.ensureAnimation()
 
 	// Checked every frame so that the interface follows the window from one
 	// monitor to another. Nothing happens unless the scale actually changes.
@@ -575,6 +605,8 @@ func (a *App) unloadShown() {
 		a.shown.model.Unload()
 		a.shown = nil
 	}
+
+	a.clearAnimationSamples()
 }
 
 // setStatus replaces the message shown in the status bar.

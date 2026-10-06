@@ -97,6 +97,34 @@ entity = {
 	attach = { right = "fountain_entity" }
 }
 `
+
+	// A skinned quad plays one animation that moves its bone, so that the
+	// model can be seen to move.
+	skinnedAsset = `
+pdxmesh = {
+	name = "skinned_mesh"
+	file = "skinned.mesh"
+	animation = { id = "moved_animation" type = "skinned_moved.anim" }
+	meshsettings = {
+		name = "skinnedShape"
+		index = 0
+		texture_diffuse = "statue_diffuse.png"
+		shader = "standard"
+	}
+}
+entity = { name = "skinned_entity" pdxmesh = "skinned_mesh" }
+`
+
+	// A flock is the same skinned entity attached twice, so its animation is
+	// listed once with a copy of its own for each attachment.
+	flockAsset = `
+entity = {
+	name = "flock_entity"
+	locator = { name = "left" position = { -2 0 0 } }
+	locator = { name = "right" position = { 2 0 0 } }
+	attach = { left = "skinned_entity" right = "skinned_entity" }
+}
+`
 )
 
 var (
@@ -158,6 +186,10 @@ func fixtureGame(t *testing.T) string {
 			statue + "meshes.asset":          []byte(meshesAsset),
 			statue + "plaza.asset":           []byte(plazaAsset),
 			statue + "windmill.asset":        []byte(windmillAsset),
+			statue + "skinned.asset":         []byte(skinnedAsset),
+			statue + "skinned.mesh":          skinnedQuadFile(),
+			statue + "skinned_moved.anim":    movedAnimationFile(),
+			statue + "flock.asset":           []byte(flockAsset),
 
 			// Two seconds of a clip made at fifteen frames a second, and
 			// four of one made at thirty.
@@ -202,6 +234,60 @@ func animationFile(fps float32, frames int) []byte {
 	}
 
 	writer.Floats("q", turns...)
+
+	return writer.Bytes()
+}
+
+// skinnedQuadFile writes a .mesh of one quad skinned to a single bone at the
+// origin, which an animation can move.
+func skinnedQuadFile() []byte {
+	quad := meshtest.Quad(2, 2)
+
+	writer := meshtest.New().Object(1, "object").Object(2, "skinnedShape").Object(3, "mesh")
+
+	writer.Floats("p", quad.Positions...).
+		Floats("n", quad.Normals...).
+		Floats("ta", quad.Tangents...).
+		Floats("u0", quad.UV0...).
+		Ints("tri", quad.Indices...)
+
+	// The skin: one bone, the same one for every vertex.
+	writer.Object(4, "skin").
+		Ints("bones", 1).
+		Ints("ix", 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1, 0, -1, -1, -1).
+		Floats("w", 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+	writer.Object(4, "aabb").Floats("min", -1, -1, 0).Floats("max", 1, 1, 0)
+	writer.Object(4, "material").Strings("shader", "standard").Strings("diff", "statue_diffuse.png")
+
+	// The skeleton: one bone at the origin.
+	writer.Object(3, "skeleton").
+		Object(4, "root").
+		Ints("ix", 0).
+		Ints("pa", -1).
+		Floats("tx", 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+	return writer.Bytes()
+}
+
+// movedAnimationFile writes an .anim file that moves its one bone a long way
+// along x in the second frame, so the skinned quad leaves the picture.
+func movedAnimationFile() []byte {
+	writer := meshtest.New()
+
+	writer.Object(1, "info").
+		Floats("fps", 10).
+		Ints("sa", 2).
+		Ints("j", 1)
+
+	writer.Object(2, "root").
+		Strings("sa", "t").
+		Floats("t", 0, 0, 0).
+		Floats("q", 0, 0, 0, -1).
+		Floats("s", 1)
+
+	writer.Object(1, "samples").
+		Floats("t", 0, 0, 0, 100, 0, 0)
 
 	return writer.Bytes()
 }

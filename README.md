@@ -85,17 +85,17 @@ random, the first is shown.
 
 An entity whose mesh can play animations gets an **Animation** panel, docked
 along the bottom of the viewport. It lists what the entity and the entities it
-attaches can play, with how long each runs, and runs a clock over a timeline
-that reaches as far as the entity's longest animation, so the lengths can be
-seen against one another. **Play** runs it, **Loop** starts it again at its
-end, **Rewind** puts it back to the beginning, and the timeline can be dragged
-to any moment of it. The clock says which frame that moment is, and the rate
-the animation was made at.
-
-The geometry is not moved by this yet: the panel reads the animations and runs
-their clock, but the model is drawn in the pose its mesh file stores. Moving
-it needs the mesh's joints and weights carried through to the GPU, which the
-viewer does not do yet.
+attaches can play, with how long each runs. An entity attached many times, as
+the seagulls of a port are, has its animations listed once, with a tick for
+every copy of it and all of them ticked to begin with; taking one off leaves
+that copy standing still while the rest play. **Play** runs the animation
+picked, **Stop** puts it back to the beginning and leaves it standing there,
+**Loop** starts it again at its end, and the timeline, which reaches as far as
+that animation runs, can be dragged to any moment of it. The clock says which
+frame that moment is, and the rate the animation was made at. Playing an
+animation moves the geometry to the pose the clock stands at: the viewer reads
+the samples of the one played and skins the model's meshes on the CPU each
+frame, the step the games do in their vertex shaders.
 
 The models are drawn with a shader of the viewer's own, an approximation of
 the games' look rather than their own shaders and lighting. It tells from the
@@ -141,8 +141,6 @@ they stay one group: `statue_entity_front_1.png`, `statue_entity_back_1.png`.
 
 What pdx-asset-go does not draw yet, the viewer does not show either:
 
-- skinning and animation: models are drawn in the pose their mesh files store,
-  so a rider stands on the saddle rather than sitting in it;
 - the games' own shaders and the lighting of their environments: the look is
   an approximation;
 - the files of `pdxmesh` definitions that no entity of the file draws.

@@ -566,7 +566,7 @@ func TestAnimationTimeline(t *testing.T) {
 		t.Errorf("its longest animation runs %gs, want 4", longest)
 	}
 
-	for _, label := range []string{labelPlay, labelLoop, labelRewind, labelTime, "Animation", textNotMoved} {
+	for _, label := range []string{labelPlay, labelLoop, labelStop, labelTime, "Animation"} {
 		if !driver.Exists(panelAnimation, label) {
 			t.Errorf("the timeline does not show %q", label)
 		}
@@ -615,11 +615,28 @@ func TestAnimationTimeline(t *testing.T) {
 		t.Errorf("paused at %gs, it moved on to %gs", stopped, application.animationTime)
 	}
 
-	// Rewinding puts it back to the start.
-	driver.Click(panelAnimation, labelRewind)
+	// Stopping puts the timeline back to the start and leaves it standing
+	// still there.
+	driver.Click(panelAnimation, labelPlay)
+
+	if !application.playing {
+		t.Fatal("it did not start playing again")
+	}
+
+	driver.Click(panelAnimation, labelStop)
 
 	if application.animationTime != 0 {
-		t.Errorf("rewound to %gs", application.animationTime)
+		t.Errorf("stopped at %gs, want the start", application.animationTime)
+	}
+
+	if application.playing {
+		t.Error("stopping left it playing")
+	}
+
+	driver.Frames(3)
+
+	if application.animationTime != 0 {
+		t.Errorf("it moved on to %gs after stopping", application.animationTime)
 	}
 
 	// An entity that can play nothing is shown without the panel.
@@ -663,6 +680,112 @@ func TestPickAnAnimation(t *testing.T) {
 
 	if !driver.Exists(panelAnimation, "0.00 / 4.00 s     frame 0 of 121 at 30 fps") {
 		t.Error("the clock does not follow the animation picked")
+	}
+}
+
+// The timeline reaches as far as the animation picked, not as far as the
+// longest of them all, so its end is the end of the clip that is playing.
+func TestTimelineSpansTheAnimationPicked(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "windmill.asset"))
+	waitForEntity(application, driver, "windmill_entity")
+
+	// The first animation runs two seconds and the second four. Dragging the
+	// timeline past the end stops at the end of the one picked.
+	driver.Drag(driver.Find(panelAnimation, labelTime), 4000, 0)
+
+	if got := application.animationTime; got < 1.99 || got > 2.01 {
+		t.Errorf("the two second animation was dragged to %gs, want its end at 2", got)
+	}
+
+	driver.Click(panelAnimation, "Animation")
+	driver.Click(uitest.AnyCombo, "turning_animation  (4.00 s)##animation1")
+
+	driver.Drag(driver.Find(panelAnimation, labelTime), 4000, 0)
+
+	if got := application.animationTime; got < 3.99 || got > 4.01 {
+		t.Errorf("the four second animation was dragged to %gs, want its end at 4", got)
+	}
+}
+
+// An animation of an entity attached many times is listed once, with a tick
+// for every copy of that entity: a copy left unticked is not moved.
+func TestAnimationOfAnEntityAttachedManyTimes(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "flock.asset"))
+	waitForEntity(application, driver, "flock_entity")
+
+	groups := application.animationGroups()
+
+	if len(groups) != 1 || len(groups[0].Attachments) != 2 {
+		t.Fatalf("the flock lists %d animations, %v; want the one its two copies play", len(groups), groups)
+	}
+
+	// The picker offers it once, not once per copy.
+	driver.Click(panelAnimation, "Animation")
+
+	if !driver.Exists(uitest.AnyCombo, "moved_animation  (0.20 s)  of skinned_entity##animation0") {
+		t.Error("the picker does not offer the animation")
+	}
+
+	if driver.Exists(uitest.AnyCombo, "moved_animation  (0.20 s)  of skinned_entity##animation1") {
+		t.Error("the picker offers the animation more than once")
+	}
+
+	driver.Press(imgui.KeyEscape)
+
+	// Every copy is listed with a tick of its own, and all of them ticked.
+	left, right := "skinned_entity at left", "skinned_entity at right"
+
+	for _, label := range []string{left, right} {
+		if !driver.Exists(panelAnimation, label) {
+			t.Fatalf("the animation does not list %q", label)
+		}
+	}
+
+	if got := application.animatedAttachments(); len(got) != 2 {
+		t.Fatalf("both copies are moved to begin with, got %v", got)
+	}
+
+	// Taking the tick off one leaves that copy standing still.
+	driver.Click(panelAnimation, left)
+
+	if got := application.animatedAttachments(); len(got) != 1 || got[0] != 2 {
+		t.Errorf("with the left copy unticked the moved attachments are %v, want the second alone", got)
+	}
+
+	// Putting it back moves both again.
+	driver.Click(panelAnimation, left)
+
+	if got := application.animatedAttachments(); len(got) != 2 {
+		t.Errorf("with both ticked again the moved attachments are %v", got)
+	}
+}
+
+// A skinned model moves when its animation plays: the quad it draws leaves
+// the picture.
+func TestAnimationMovesTheModel(t *testing.T) {
+	application, driver := startApp(t)
+
+	openFile(t, application, driver, fixtureFile(t, "skinned.asset"))
+	waitForEntity(application, driver, "skinned_entity")
+
+	// The selected animation's samples are read off the drawing thread.
+	driver.WaitFor("the animation to be read", func() bool { return application.animationSamples != nil })
+
+	if got := centre(application); !redder(got) {
+		t.Errorf("centre of the viewport = %v at rest, want the red quad", got)
+	}
+
+	// The second frame of the animation is a long way along x, which leaves
+	// the picture.
+	application.animationTime = 0.1
+	driver.Frame()
+
+	if got := centre(application); redder(got) {
+		t.Errorf("centre of the viewport = %v after moving, want the background", got)
 	}
 }
 
