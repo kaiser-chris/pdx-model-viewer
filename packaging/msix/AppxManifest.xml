@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The package manifest for the Microsoft Store. build-msix.ps1 replaces
+  $VERSION$ with the version it packs.
+
+  The identity, the display names and the application id are the ones the
+  Store listing was created with; changing them makes a different app.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap10 rescap">
+
+  <Identity
+    Name="ChrisBahmutKaiser.PDXModelViewer"
+    Publisher="CN=DF95829D-20FA-471F-BF70-6EE0E21C1083"
+    Version="$VERSION$"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>PDX Model Viewer</DisplayName>
+    <PublisherDisplayName>Chris 'Bahmut' Kaiser</PublisherDisplayName>
+    <Description>A viewer for the 3D models of Victoria 3, Europa Universalis 5 and Crusader Kings 3.</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:PackageIntegrity>
+      <uap10:Content Enforcement="on" />
+    </uap10:PackageIntegrity>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22000.1" />
+  </Dependencies>
+
+  <!--
+    The application starts directly. It keeps its settings in %AppData%, which
+    Windows gives every packaged application its own copy of, and carries its
+    assets inside the executable, so it needs none of the launcher fixes the
+    Package Support Framework offers.
+  -->
+  <Applications>
+    <Application Id="PDXMODELVIEWER" Executable="pdx-model-viewer.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        BackgroundColor="transparent"
+        DisplayName="PDX Model Viewer"
+        Description="PDX Model Viewer"
+        Square150x150Logo="Assets\PDXMODELVIEWER-Square150x150Logo.png"
+        Square44x44Logo="Assets\PDXMODELVIEWER-Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\PDXMODELVIEWER-Wide310x150Logo.png"
+          Square310x310Logo="Assets\PDXMODELVIEWER-Square310x310Logo.png"
+          Square71x71Logo="Assets\PDXMODELVIEWER-Square71x71Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!--
+          What the viewer is for: .asset files open with it, and Windows
+          draws them with its icon. The file is passed as the one argument,
+          which is what cmd/pdx-model-viewer reads.
+
+          The icon is the application's own 44x44 logo. Its targetsize
+          images, down to 16 and up to 256, and their unplated forms are the
+          sizes Explorer asks a file icon for, so there is nothing a separate
+          set of images would add.
+        -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="asset">
+            <uap:DisplayName>Paradox Asset File</uap:DisplayName>
+            <uap:InfoTip>A Paradox asset file, which defines the entities of a 3D model.</uap:InfoTip>
+            <uap:Logo>Assets\PDXMODELVIEWER-Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.asset</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
