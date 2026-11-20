@@ -96,6 +96,14 @@ func Button(label string) bool {
 	return pressed
 }
 
+// SmallButton is imgui.SmallButton.
+func SmallButton(label string) bool {
+	pressed := imgui.SmallButton(label)
+	record(label, false)
+
+	return pressed
+}
+
 // Checkbox is imgui.Checkbox.
 func Checkbox(label string, value *bool) bool {
 	changed := imgui.Checkbox(label, value)

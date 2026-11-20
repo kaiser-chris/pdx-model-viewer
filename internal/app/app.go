@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/AllenDang/cimgui-go/imgui"
 	rl "github.com/gen2brain/raylib-go/raylib"
@@ -156,6 +157,12 @@ type App struct {
 	// kept from then on rather than chosen for each entity.
 	paletteChosen bool
 
+	// graphics is the name of the graphics chip the window draws with, which
+	// the warning of a slow model names, and frameRate judges whether the
+	// model is drawn fast enough; see slow.go.
+	graphics  string
+	frameRate frameRate
+
 	// dockSpaceID is the dock space of the current frame, which placing a
 	// panel in a layout saved before it existed needs.
 	dockSpaceID imgui.ID
@@ -287,6 +294,7 @@ func New(options Options) (*App, error) {
 	application.viewer = renderer.NewViewer(1, 1)
 	application.viewer.Background = viewportBackground
 	application.dockWindowClass = imgui.NewWindowClass()
+	application.graphics = graphicsName()
 
 	application.window.OnShutdown(func() {
 		savePlacement(placementFile, application.window.Placement())
@@ -382,6 +390,10 @@ func (a *App) frame() {
 	a.pollExport()
 	a.pollAnimationReading()
 	a.ensureAnimation()
+
+	// The rate is judged on the frames of a model being drawn, which is what
+	// makes them slow, in a window that is not minimized, which may draw few.
+	a.frameRate.frame(time.Now(), a.shown != nil && !rl.IsWindowMinimized())
 
 	// Checked every frame so that the interface follows the window from one
 	// monitor to another. Nothing happens unless the scale actually changes.

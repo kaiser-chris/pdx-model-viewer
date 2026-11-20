@@ -972,3 +972,28 @@ func setLayoutVersion(t *testing.T, path string, version int) {
 		t.Fatal(err)
 	}
 }
+
+// A model drawn too slowly is warned of in the status bar, which names the
+// graphics chip the window draws with.
+func TestSlowGraphicsAreWarnedOf(t *testing.T) {
+	application, driver := startApp(t)
+
+	if application.graphics == "" || application.graphics == "an unknown graphics chip" {
+		t.Errorf("the graphics chip is %q, want the driver's name for it", application.graphics)
+	}
+
+	openFile(t, application, driver, fixtureFile(t, "pedestal.asset"))
+	waitForEntity(application, driver, "pedestal_entity")
+
+	if driver.Exists("", "Slow graphics") {
+		t.Fatal("a model drawn as fast as the tests draw it is warned of as slow")
+	}
+
+	application.frameRate.slow, application.frameRate.rate = true, 4
+	driver.Frames(2)
+
+	if !driver.Exists("", "Slow graphics") {
+		t.Error("the status bar does not warn of a slow model")
+		driver.Dump()
+	}
+}

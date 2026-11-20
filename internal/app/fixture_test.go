@@ -128,7 +128,9 @@ entity = {
 `
 
 	// A belt is a portrait accessory: its game data names the mask that says
-	// where each pattern goes, and the variation that says what they are.
+	// where each pattern goes, and the variation that says what they are. Its
+	// diffuse map is white, as a patterned part's mostly is: a pattern
+	// multiplies the part's colour, so that the palette shows as it is.
 	beltAsset = `
 pdxmesh = {
 	name = "belt_mesh"
@@ -136,7 +138,7 @@ pdxmesh = {
 	meshsettings = {
 		name = "quadShape"
 		index = 0
-		texture_diffuse = "statue_diffuse.png"
+		texture_diffuse = "belt_diffuse.png"
 		shader = "portrait_attachment_pattern"
 	}
 }
@@ -188,10 +190,13 @@ entity = {
 	// The patterns are named as the games name theirs, which for one of them
 	// is three names long: what a pattern is described by is the textures it
 	// draws with, one for each channel of the mask it is not the same for.
+	// Each brings a material, as the games' patterns do, whose red is the
+	// occlusion the pattern darkens the part by: without one, the part's own
+	// material stands in, whose red means something else.
 	beltVariation = `
-pattern_textures = { name = "generic_cotton_standard_fine_01" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
-pattern_textures = { name = "generic_silk_fine_plain_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
-pattern_textures = { name = "european_wool_standard_striped_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" }
+pattern_textures = { name = "generic_cotton_standard_fine_01" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" properties = "gfx/portraits/accessory_variations/textures/fixture_properties.png" }
+pattern_textures = { name = "generic_silk_fine_plain_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" properties = "gfx/portraits/accessory_variations/textures/fixture_properties.png" }
+pattern_textures = { name = "european_wool_standard_striped_02" colormask = "gfx/portraits/accessory_variations/textures/fixture_masks.png" properties = "gfx/portraits/accessory_variations/textures/fixture_properties.png" }
 pattern_layout = { name = "plain_layout" scale = 1 rotation = 0 offset = { x = 0 y = 0 } }
 
 variation = {
@@ -244,6 +249,10 @@ var (
 	// A flat normal and a plain, rough material.
 	fixtureNormal     = color.NRGBA{R: 128, G: 128, B: 255, A: 255}
 	fixtureProperties = color.NRGBA{R: 0, G: 64, B: 0, A: 255}
+
+	// fixturePatternProperties is the material of a pattern: nothing hidden
+	// from the light in its red, and otherwise the plain material above.
+	fixturePatternProperties = color.NRGBA{R: 255, G: 64, B: 0, A: 255}
 )
 
 // outsideAsset is an asset file kept outside the game, with its mesh next
@@ -303,16 +312,18 @@ func fixtureGame(t *testing.T) string {
 			statue + "belt.asset":            []byte(beltAsset),
 			statue + "plain_belt.asset":      []byte(plainBeltAsset),
 			statue + "belt.mesh":             meshtest.QuadFile(2, 2),
+			statue + "belt_diffuse.png":      solid(t, fixtureWhite),
 
 			// The variation of the belt, with the mask that says where each
 			// of its patterns goes and the palettes it draws them in. The
 			// pattern covers everything, as the plain silk of most of the
 			// shipped variations does.
-			"gfx/portraits/accessory_variations/fixture.txt":                []byte(beltVariation),
-			"gfx/models/portraits/belt/belt_masks.png":                      solid(t, fixtureWhite),
-			"gfx/portraits/accessory_variations/textures/fixture_masks.png": solid(t, fixtureWhite),
-			"gfx/portraits/accessory_variations/textures/fixture_red.png":   solid(t, fixtureRed),
-			"gfx/portraits/accessory_variations/textures/fixture_blue.png":  solid(t, fixtureBlue),
+			"gfx/portraits/accessory_variations/fixture.txt":                     []byte(beltVariation),
+			"gfx/models/portraits/belt/belt_masks.png":                           solid(t, fixtureWhite),
+			"gfx/portraits/accessory_variations/textures/fixture_masks.png":      solid(t, fixtureWhite),
+			"gfx/portraits/accessory_variations/textures/fixture_red.png":        solid(t, fixtureRed),
+			"gfx/portraits/accessory_variations/textures/fixture_properties.png": solid(t, fixturePatternProperties),
+			"gfx/portraits/accessory_variations/textures/fixture_blue.png":       solid(t, fixtureBlue),
 
 			// Two seconds of a clip made at fifteen frames a second, and
 			// four of one made at thirty.

@@ -240,9 +240,29 @@ func (a *App) statusBar() {
 
 			right := a.diagnostics()
 
+			// Everything on the right is placed from the right edge of the
+			// bar, which stays where it is however much stands left of it.
+			spacing := imgui.CurrentStyle().ItemSpacing().X
+			edge := imgui.CursorPosX() + imgui.ContentRegionAvail().X
+
+			// A model drawn too slowly says why when pointed at. The button
+			// stands left of the diagnostics, as wide as its label and the
+			// padding of a button.
+			if slow := a.slowWarning(); slow != "" {
+				width := imgui.CalcTextSize(slow).X + imgui.CurrentStyle().FramePadding().X*2
+
+				imgui.SameLine()
+				imgui.SetCursorPosX(edge - imgui.CalcTextSize(right).X - spacing - width)
+
+				gui.PushWarningColor()
+				gui.SmallButton(slow)
+				imgui.PopStyleColor()
+				a.slowTooltip()
+			}
+
 			// Right align the diagnostics.
 			imgui.SameLine()
-			imgui.SetCursorPosX(imgui.ContentRegionAvail().X - imgui.CalcTextSize(right).X)
+			imgui.SetCursorPosX(edge - imgui.CalcTextSize(right).X)
 			gui.TextDisabled(right)
 
 			imgui.EndMenuBar()
